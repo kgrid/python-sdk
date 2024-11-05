@@ -15,7 +15,6 @@ class Ko:
         try:
             package_root = resources.files(self.package_name)
             metadata_path = package_root.parent / self.metadata_file
-            print("-> " + str(metadata_path))
             if metadata_path.exists():
                 with open(metadata_path, 'r') as file:
                     return json.load(file)
