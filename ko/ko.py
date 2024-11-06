@@ -1,17 +1,30 @@
+import asyncio
 import json
-import os
-# import pkg_resources
 import importlib.resources as resources
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
+from typing import Callable
+import inspect
+import argparse
+
 
 class Ko:
     METADATA_FILE = "metadata.json" # by default it is located in the root of the ko
-    def __init__(self,package_name, metadata_file=METADATA_FILE):
+    def __init__(self,package_name,knowledges, metadata_file=METADATA_FILE):
         self.package_name = package_name
         self.metadata_file = metadata_file
         self.metadata = self._load_metadata()
-       
-    def _load_metadata(self):     
-       
+        self.knowledges = {func.__name__: func for func in knowledges}
+        self.app = FastAPI(
+            title=package_name,
+            description=self.metadata.get('dc:description', 'Unknown description'),
+            version=self.get_version(),
+            contact={"name":self.metadata.get('koio:contributors', 'Unknown contact')},
+        )
+        self._setup_routes()
+        self.parser = None
+     
+    def _load_metadata(self):       
         try:
             package_root = resources.files(self.package_name)
             metadata_path = package_root.parent / self.metadata_file
@@ -27,4 +40,49 @@ class Ko:
         return self.metadata.get('version', 'Unknown version')
     
     def get_metadata(self):
-        return self.metadata
+        return self.metadata    
+       
+    def create_wrapper(self, func: Callable):
+        # Get the expected parameter names of the function
+        signature = inspect.signature(func)
+        param_names = list(signature.parameters.keys())
+
+        async def wrapper(input: dict):
+            # Extract the required parameters from `input` dict
+            kwargs = {name: input.get(name) for name in param_names}
+            return func(**kwargs)
+
+        return wrapper
+    
+    def execute(self, input: dict, knowledge_function: str=None): # if multiple knowledge functions, mention the function name 
+        wrapper_coro = self.create_wrapper(self.knowledges[knowledge_function] if knowledge_function else next(iter(self.knowledges.values())))(input)
+        return asyncio.run(wrapper_coro)
+    
+    ### API service methods
+    def _setup_routes(self):
+        # Root route to redirect to docs
+        @self.app.get("/", include_in_schema=False)
+        async def root(request: Request):
+            return RedirectResponse(url="/docs")
+    def add_endpoint(self, path: str,knowledge_function:str=None, methods=["POST"], tags=None): # if multiple knowledge functions, mention the function name 
+        # Add a custom endpoint to the app
+        self.app.add_api_route(path, self.create_wrapper(self.knowledges[knowledge_function] if knowledge_function else next(iter(self.knowledges.values()))), methods=methods, tags=tags)
+    ###
+    
+    ### CLI service methods
+    def define_cli(self):
+        self.parser = argparse.ArgumentParser(description=self.metadata["dc:description"], formatter_class=argparse.RawTextHelpFormatter)
+        
+    def add_argument(self, *args, **kwargs):
+        if not self.parser:
+            raise ValueError("CLI parser is not defined. Call define_cli() before adding arguments.")
+        self.parser.add_argument(*args, **kwargs)
+    
+    def execute_cli(self, knowledge_function: str=None):
+        if not self.parser:
+            raise ValueError("CLI parser is not defined. Call define_cli() and add arguments before executing.")
+        args = self.parser.parse_args()
+        input=vars(args)
+        result = self.execute(input, knowledge_function)        
+        print(json.dumps(result, indent=4))
+    ###
