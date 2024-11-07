@@ -58,6 +58,10 @@ class Ko:
         wrapper_coro = self.create_wrapper(self.knowledges[knowledge_function] if knowledge_function else next(iter(self.knowledges.values())))(input)
         return asyncio.run(wrapper_coro)
     
+    def execute1(self, knowledge_function: str=None, *args, **kwargs): # if multiple knowledge functions, mention the function name 
+        return self.knowledges[knowledge_function] if knowledge_function else next(iter(self.knowledges.values()))( *args, **kwargs)
+        
+    
     ### API service methods
     def _setup_routes(self):
         # Root route to redirect to docs
