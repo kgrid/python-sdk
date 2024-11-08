@@ -77,6 +77,7 @@ class Ko:
     def define_cli(self):
         self.parser = argparse.ArgumentParser(description=self.metadata["dc:description"], formatter_class=argparse.RawTextHelpFormatter)
         
+        
     def add_argument(self, *args, **kwargs):
         if not self.parser:
             raise ValueError("CLI parser is not defined. Call define_cli() before adding arguments.")
