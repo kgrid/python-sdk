@@ -1,1 +1,5 @@
 
+kgrid/__pycache__/*
+tests/__pycache__/*
+
+.vscode/*

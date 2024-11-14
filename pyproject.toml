@@ -1,14 +1,24 @@
 [tool.poetry]
-name = "ko"
-version = "0.2.1"
+name = "kgrid"
+version = "0.2.3"
 description = "SDK for KGrid 2.0 Knowledge objects"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-fastapi = "^0.115.4"
+fastapi = { version = "^0.115.4", optional = true }
 
+[tool.poetry.extras]
+api = ["fastapi"]
+
+[tool.poetry.group.dev.dependencies]
+hypertension-screening = {path = "/home/faridsei/dev/code/USPSTF-collection/hypertension-screening/dist/hypertension_screening-1.2-py3-none-any.whl"}
+abdominal-aortic-aneurysm-screening = {path = "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/dist/abdominal_aortic_aneurysm_screening-1.1-py3-none-any.whl"}
+cardiovascular-prevention-diet-activity = {path = "/home/faridsei/dev/code/USPSTF-collection/cardiovascular-prevention-diet-activity/dist/cardiovascular_prevention_diet_activity-1.1-py3-none-any.whl"}
+cardiovascular-prevention-statin-use = {path = "/home/faridsei/dev/code/USPSTF-collection/cardiovascular-prevention-statin-use/dist/cardiovascular_prevention_statin_use-1.1-py3-none-any.whl"}
+diabetes-screening = {path = "/home/faridsei/dev/code/USPSTF-collection/diabetes-screening/dist/diabetes_screening-1.1-py3-none-any.whl"}
+high-body-mass-index = {path = "/home/faridsei/dev/code/USPSTF-collection/high-body-mass-index/dist/high_body_mass_index-1.1-py3-none-any.whl"}
 
 [build-system]
 requires = ["poetry-core"]

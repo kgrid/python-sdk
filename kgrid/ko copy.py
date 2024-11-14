@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 
 
-class Ko:
+class Ko_copy:
     METADATA_FILE = "metadata.json"  # by default it is located in the root of the ko
 
     def __init__(self, package_name, knowledges, metadata_file=METADATA_FILE):
