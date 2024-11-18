@@ -188,7 +188,10 @@ USPSTF_Collection.add_knowledge_object( hypertension_screening )
 USPSTF_Collection.add_knowledge_object( diabetes_screening )
 USPSTF_Collection.add_knowledge_object( high_body_mass_index )
 ```
-Once ready, the collection can be packaged and installed as an external package in any Python application.
+Once ready, the collection can be packaged and installed as an external package in any Python application. Here is an example:
+```bash
+pip install https://github.com/kgrid/python-sdk/releases/download/1.0/uspstf_collection-0.1.0-py3-none-any.whl
+```
 
 To execute the collection on a patient's data, install and import the `USPSTF_Collection` (if used as a package). Use the `calculate_for_all` method, passing a JSON input that includes all the required parameters for each knowledge object in the collection.
 ```python
