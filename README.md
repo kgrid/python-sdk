@@ -36,7 +36,8 @@ poetry add kgrid -E api
 ```
 
 ## Usage
-To inherit the core functionalities of the SDK, extend `kgrid.Ko` in your knowledge object. For example:
+### `kgrid.Ko`
+To inherit the core functionalities of the SDK, extend the `kgrid.Ko` class in your knowledge object. For example:
 ```python
 from kgrid import Ko
 
@@ -44,19 +45,27 @@ class Prevent_obesity_morbidity_mortality(Ko):
     def __init__(self):
         super().__init__(__package__)
 ```
+This class adds core functionalities to the knowledge object (KO), such as `get_version` and `get_metadata`.
 
-Use `kgrid.Ko`_Execution to include the `execute` method in your knowledge object:
+### `kgrid.Ko_Execution`
+The `Ko_Execution` class extends `Ko` to include a universal `execute` method for knowledge objects. The constructor of this class accepts an array of knowledge functions, and the `execute` method can optionally take the name of the function to execute. If no function name is provided, the `execute` method defaults to executing the first function. This is particularly useful for KOs with only one knowledge function.
 ```python
 from kgrid import Ko_Execution
 
 class Pregnancy_healthy_weight_gain(Ko_Execution):
     def __init__(self):
         super().__init__(__package__, [self.get_pregnancy_healthy_weight_gain_recommendation])
+
+    @staticmethod
+    def get_pregnancy_healthy_weight_gain_recommendation(pregnant):
+    ...        
 ```
+The `execute` method takes a JSON input, mapping it to the knowledge representation's input parameters using a wrapper. The JSON input may include unrelated parameters, which are ignored by the wrapper.
 
-In this level, you pass the knowledge function to the constructor of the superclass.
+The `execute` method is used by the SDK's collection class, API, and CLI services.
 
-To use the SDK to implement an API or CLI service for your knowledge object, use the `kgrid.Ko_API` and `kgrid.CLI` classes:
+### `kgrid.Ko_API` and `kgrid.CLI`
+To implement an API or CLI service for your knowledge object, extend the `kgrid.Ko_API` and `kgrid.CLI` classes:
 ```python
 from kgrid import Ko_API
 from kgrid import Ko_CLI
@@ -66,9 +75,9 @@ class Abdominal_aortic_aneurysm_screening(Ko_API,Ko_CLI):
         super().__init__(__package__, [self.get_abdominal_aortic_aneurysm_screening])
 ```
 
-This will include the `execute` function in your knowledge object as well.
+These classes extend `Ko_Execution` and therefore they include the `execute` method to your knowledge object.
 
-For a complete example of using the SDK to implement API, CLI, and activator services, see the knowledge objects created in our USPSTF collection repository or refer to the code below.
+For a complete example of implementing API, CLI, and activator services using the SDK, see the knowledge objects created in our USPSTF collection repository or refer to the example code below:
 ```python
 from kgrid import Ko_API
 from kgrid import Ko_CLI
@@ -156,4 +165,46 @@ def apply(input):
     return abdominal_aortic_aneurysm_screening.execute(input)
 ```
 
-The activator example requires a service specification file and a deployment file that points to the `apply` method. For more details, please refer to the [Python Activator](https://github.com/kgrid/python-activator) documentation.
+Note: The activator example requires a service specification file and a deployment file pointing to the `apply` method. For more details, refer to the [Python Activator](https://github.com/kgrid/python-activator) documentation.
+
+### `kgrid.Collection`
+The `kgrid.Collection` class can be used to create a collection of knowledge objects. Start by importing and creating an instance of the `Collection` class. Use the `add_knowledge_object` method to add knowledge objects that extend `kgrid.Ko_Execution` or higher-level SDK classes like `kgrid.Ko_API` or `kgrid.CLI`. This requirement ensures that the collection works with KOs containing the SDK `execute` method.
+```python
+from abdominal_aortic_aneurysm_screening import abdominal_aortic_aneurysm_screening
+from cardiovascular_prevention_diet_activity import cardiovascular_prevention_diet_activity
+from cardiovascular_prevention_statin_use import cardiovascular_prevention_statin_use
+from hypertension_screening import hypertension_screening
+from diabetes_screening import diabetes_screening
+from high_body_mass_index import high_body_mass_index
+
+from kgrid.collection import Collection
+
+
+USPSTF_Collection = Collection("USPSTF_Collection")
+USPSTF_Collection.add_knowledge_object( abdominal_aortic_aneurysm_screening )
+USPSTF_Collection.add_knowledge_object( cardiovascular_prevention_diet_activity )
+USPSTF_Collection.add_knowledge_object( cardiovascular_prevention_statin_use )
+USPSTF_Collection.add_knowledge_object( hypertension_screening )
+USPSTF_Collection.add_knowledge_object( diabetes_screening )
+USPSTF_Collection.add_knowledge_object( high_body_mass_index )
+```
+Once ready, the collection can be packaged and installed as an external package in any Python application.
+
+To execute the collection on a patient's data, install and import the `USPSTF_Collection` (if used as a package). Use the `calculate_for_all` method, passing a JSON input that includes all the required parameters for each knowledge object in the collection.
+```python
+from uspstf_collection import USPSTF_Collection
+import json
+
+patient_data={
+    "age":42,
+    "bmi":33,
+    "bmi_percentile":95.5,
+    "has_never_smoked": True,
+    "has_cardiovascular_risk_factors":True,
+    "ten_year_CVD_risk":8,
+    "hypertension":False        
+}
+
+result = USPSTF_Collection.calculate_for_all(patient_data)
+print(json.dumps(result, indent=4))
+```
