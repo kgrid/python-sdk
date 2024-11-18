@@ -27,7 +27,7 @@ poetry install -E api
 or
 
 ```bash
-pip install kgid[api] 
+pip install kgrid[api] 
 ```
 
 When adding kgrid as a dependency (to a knowledge object) you can include the api optional dependencies using

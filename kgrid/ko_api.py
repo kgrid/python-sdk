@@ -1,5 +1,8 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+try:
+    from fastapi import FastAPI, Request
+    from fastapi.responses import RedirectResponse
+except ImportError:
+    print("API functionality not installed. Install with `-E api`.")
 
 from kgrid.ko_execution import Ko_Execution
 

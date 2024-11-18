@@ -16,7 +16,7 @@ def test_collection():
     collection.add_knowledge_object( high_body_mass_index )
     
     patient = {
-        "age":35,
+        "age":42,
         "bmi":33,
         "bmi_percentile":95.5,
         "has_never_smoked": True,
