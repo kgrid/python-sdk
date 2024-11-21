@@ -6,8 +6,8 @@ from kgrid_sdk.ko import Ko
 
 class Ko_Execution(Ko):
     METADATA_FILE = "metadata.json" 
-    def __init__(self, package_name, knowledges, metadata_file=METADATA_FILE):
-        super().__init__(package_name,metadata_file) # , **kwargs
+    def __init__(self,  knowledges, metadata_file=METADATA_FILE):
+        super().__init__(metadata_file) # , **kwargs
         self.knowledges = {func.__name__: func for func in knowledges}
 
     def create_wrapper(self, func: Callable):

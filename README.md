@@ -62,7 +62,7 @@ class Prevent_obesity_morbidity_mortality(Ko):
 This class adds core functionalities to the knowledge object (KO), such as `get_version` and `get_metadata`.
 
 ### `kgrid_sdk.Ko_Execution`
-The `Ko_Execution` class extends `Ko` to include a universal `execute` method for knowledge objects. The constructor of this class accepts an array of knowledge functions, and the `execute` method can optionally take the name of the function to execute. If no function name is provided, the `execute` method defaults to executing the first function. This is particularly useful for KOs with only one knowledge function.
+The `Ko_Execution` class extends `Ko` to include a universal `execute` method for knowledge objects. The constructor of this class accepts an array of knowledge representations (functions), and the `execute` method can optionally take the name of the function to execute. If no function name is provided, the `execute` method defaults to executing the first function. This is particularly useful for KOs with only one knowledge representation. The knowledge representations could be added as static methods of the knowledge object class or could be defined as individual functions.
 ```python
 from kgrid_sdk import Ko_Execution
 

@@ -26,7 +26,7 @@ class Collection:
     def add_knowledge_object(self, knowledge_object:Ko):
         if not isinstance(knowledge_object, Ko):
             raise TypeError("Object must inherit from Ko")
-        self.knowledge_objects[knowledge_object.package_name] = knowledge_object
+        self.knowledge_objects[knowledge_object.get_id()] = knowledge_object
 
     def calculate_for_all(self, patient_data):
         results = {}

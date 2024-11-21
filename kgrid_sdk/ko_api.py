@@ -9,11 +9,11 @@ from kgrid_sdk.ko_execution import Ko_Execution
 
 class Ko_API(Ko_Execution):
     METADATA_FILE = "metadata.json" 
-    def __init__(self, package_name, knowledges, metadata_file=METADATA_FILE):
-        super().__init__(package_name,knowledges,metadata_file)
+    def __init__(self,  knowledges, metadata_file=METADATA_FILE):
+        super().__init__(knowledges,metadata_file)
         
         self.app = FastAPI(
-            title=package_name,
+            title=self.metadata.get("dc:title", "Unknown title"),
             description=self.metadata.get("dc:description", "Unknown description"),
             version=self.get_version(),
             contact={"name": self.metadata.get("koio:contributors", "Unknown contact")},
