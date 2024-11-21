@@ -1,3 +1,5 @@
+# kgrid_sdk
+
 ## Implementation
 ### Dependency management
 To manage dependencies and make it possible to only install dependencies required for what you want to use from SDK we decided to use Python's Optional Dependencies rather than creating separate packages for each class.
@@ -5,10 +7,10 @@ To manage dependencies and make it possible to only install dependencies require
 Packaging each class separately has its advantages, especially if each class represents a distinct, independent feature with unique dependencies which is not the case in our usecase. However, using optional dependencies within a single package can offer significant benefits in terms of usability and maintainability. Here’s a comparison to help decide which approach might work best for you
 
 1. Installation Simplicity
-With optional dependencies, users install a single package (kgrid) and add only the extra features they need using extras (e.g., kgrid[cli]). This is generally simpler and more user-friendly, as all features are accessible through a single, central package
+With optional dependencies, users install a single package (kgrid_sdk) and add only the extra features they need using extras (e.g., kgrid_sdk[cli]). This is generally simpler and more user-friendly, as all features are accessible through a single, central package
 
 2. Namespace and Code Organization
-Keeping everything in a single package means all classes share the same namespace and project structure, making the API simpler and more cohesive for users. They import from KGrid package regardless of the feature set they need, which simplifies code and documentation.
+Keeping everything in a single package means all classes share the same namespace and project structure, making the API simpler and more cohesive for users. They import from kgrid_sdk package regardless of the feature set they need, which simplifies code and documentation.
 
 3. Code Reusability and Dependency Management
 A single package with optional dependencies is easier to manage if some classes share common dependencies. You only define common dependencies once, and updates propagate across all features. It also avoids versioning conflicts between interdependent features.
@@ -19,27 +21,39 @@ Users can install only what they need, making the package lightweight without re
 5. Version Management and Compatibility
 You manage versioning in one central package. Compatibility between the core and extras is generally simpler to control, as everything is versioned and released together.
 
-The current version of SDK only has optional dependencies for Ko_API class. If this class is ised, these optional dependencies could be installed with the package using:
-```bash
-poetry install -E api
-```
-
-or
-
-```bash
-pip install kgrid[api] 
-```
-
-When adding kgrid as a dependency (to a knowledge object) you can include the api optional dependencies using
-```bash
-poetry add kgrid -E api
-```
+The current version of the SDK only has optional dependencies for Ko_API class. If this class is used, these optional dependencies could be installed with the package using `-E api` if you are using `poetry install` or `poetry add` and using `[api]` if you are using `pip install`.
 
 ## Usage
-### `kgrid.Ko`
-To inherit the core functionalities of the SDK, extend the `kgrid.Ko` class in your knowledge object. For example:
+You can use this package to implement python Knowledge Objects.
+
+### use  kgrid_sdk package as a dependency in your Knowledge Object
+The `kgrid_sdk` package is available on PyPI and can be easily added as a dependency to your project. Here’s how to include it in your project based on your setup:
+
+#### using Poetry
+- For the base package:
+```bash
+poetry add kgrid_sdk
+```
+
+- If you need to use the KO-API class, include the api extra:
+```
+poetry add kgrid_sdk -E api
+```
+
+#### Using pip
+If you are not using Poetry, you can install the package with pip:
+- For the base package:
+```
+pip install kgrid_sdk
+```
+- To include the KO-API extra:
+```
+pip install kgrid_sdk[api] 
+```
+### `kgrid_sdk.Ko`
+To inherit the core functionalities of the SDK, extend the `kgrid_sdk.Ko` class in your knowledge object. For example:
 ```python
-from kgrid import Ko
+from kgrid_sdk import Ko
 
 class Prevent_obesity_morbidity_mortality(Ko):
     def __init__(self):
@@ -47,10 +61,10 @@ class Prevent_obesity_morbidity_mortality(Ko):
 ```
 This class adds core functionalities to the knowledge object (KO), such as `get_version` and `get_metadata`.
 
-### `kgrid.Ko_Execution`
+### `kgrid_sdk.Ko_Execution`
 The `Ko_Execution` class extends `Ko` to include a universal `execute` method for knowledge objects. The constructor of this class accepts an array of knowledge functions, and the `execute` method can optionally take the name of the function to execute. If no function name is provided, the `execute` method defaults to executing the first function. This is particularly useful for KOs with only one knowledge function.
 ```python
-from kgrid import Ko_Execution
+from kgrid_sdk import Ko_Execution
 
 class Pregnancy_healthy_weight_gain(Ko_Execution):
     def __init__(self):
@@ -64,11 +78,11 @@ The `execute` method takes a JSON input, mapping it to the knowledge representat
 
 The `execute` method is used by the SDK's collection class, API, and CLI services.
 
-### `kgrid.Ko_API` and `kgrid.CLI`
-To implement an API or CLI service for your knowledge object, extend the `kgrid.Ko_API` and `kgrid.CLI` classes:
+### `kgrid_sdk.Ko_API` and `kgrid_sdk.CLI`
+To implement an API or CLI service for your knowledge object, extend the `kgrid_sdk.Ko_API` and `kgrid_sdk.CLI` classes:
 ```python
-from kgrid import Ko_API
-from kgrid import Ko_CLI
+from kgrid_sdk import Ko_API
+from kgrid_sdk import Ko_CLI
 
 class Abdominal_aortic_aneurysm_screening(Ko_API,Ko_CLI):
     def __init__(self):
@@ -79,8 +93,8 @@ These classes extend `Ko_Execution` and therefore they include the `execute` met
 
 For a complete example of implementing API, CLI, and activator services using the SDK, see the knowledge objects created in our USPSTF collection repository or refer to the example code below:
 ```python
-from kgrid import Ko_API
-from kgrid import Ko_CLI
+from kgrid_sdk import Ko_API
+from kgrid_sdk import Ko_CLI
 
 
 class Abdominal_aortic_aneurysm_screening(Ko_API,Ko_CLI):
@@ -167,8 +181,8 @@ def apply(input):
 
 Note: The activator example requires a service specification file and a deployment file pointing to the `apply` method. For more details, refer to the [Python Activator](https://github.com/kgrid/python-activator) documentation.
 
-### `kgrid.Collection`
-The `kgrid.Collection` class can be used to create a collection of knowledge objects. Start by importing and creating an instance of the `Collection` class. Use the `add_knowledge_object` method to add knowledge objects that extend `kgrid.Ko_Execution` or higher-level SDK classes like `kgrid.Ko_API` or `kgrid.CLI`. This requirement ensures that the collection works with KOs containing the SDK `execute` method.
+### `kgrid_sdk.Collection`
+The `kgrid_sdk.Collection` class can be used to create a collection of knowledge objects. Start by importing and creating an instance of the `Collection` class. Use the `add_knowledge_object` method to add knowledge objects that extend `kgrid_sdk.Ko_Execution` or higher-level SDK classes like `kgrid_sdk.Ko_API` or `kgrid_sdk.CLI`. This requirement ensures that the collection works with KOs containing the SDK `execute` method.
 ```python
 from abdominal_aortic_aneurysm_screening import abdominal_aortic_aneurysm_screening
 from cardiovascular_prevention_diet_activity import cardiovascular_prevention_diet_activity
@@ -177,7 +191,7 @@ from hypertension_screening import hypertension_screening
 from diabetes_screening import diabetes_screening
 from high_body_mass_index import high_body_mass_index
 
-from kgrid.collection import Collection
+from kgrid_sdk.collection import Collection
 
 
 USPSTF_Collection = Collection("USPSTF_Collection")

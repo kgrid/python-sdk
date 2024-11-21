@@ -1,7 +1,7 @@
 
 import importlib.resources as resources
 import json
-from kgrid.ko import Ko
+from kgrid_sdk.ko import Ko
 
 class Collection:
     METADATA_FILE = "metadata.json"

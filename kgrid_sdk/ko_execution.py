@@ -1,7 +1,7 @@
 
 import inspect
 from typing import Callable
-from kgrid.ko import Ko
+from kgrid_sdk.ko import Ko
 
 
 class Ko_Execution(Ko):

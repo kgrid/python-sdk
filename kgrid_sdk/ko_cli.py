@@ -1,7 +1,7 @@
 import argparse
 import json
 
-from kgrid.ko_execution import Ko_Execution
+from kgrid_sdk.ko_execution import Ko_Execution
 
 
 class Ko_CLI(Ko_Execution):

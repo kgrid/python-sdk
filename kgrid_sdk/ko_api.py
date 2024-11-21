@@ -4,7 +4,7 @@ try:
 except ImportError:
     print("API functionality not installed. Install with `-E api`.")
 
-from kgrid.ko_execution import Ko_Execution
+from kgrid_sdk.ko_execution import Ko_Execution
 
 
 class Ko_API(Ko_Execution):
