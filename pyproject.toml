@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kgrid_sdk"
-version = "0.0.4"
+version = "0.0.5"
 description = "SDK for KGrid 2.0 Knowledge objects"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"

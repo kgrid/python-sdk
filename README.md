@@ -57,7 +57,7 @@ from kgrid_sdk import Ko
 
 class Prevent_obesity_morbidity_mortality(Ko):
     def __init__(self):
-        super().__init__(__package__)
+        super().__init__()
 ```
 This class adds core functionalities to the knowledge object (KO), such as `get_version` and `get_metadata`.
 
@@ -68,7 +68,7 @@ from kgrid_sdk import Ko_Execution
 
 class Pregnancy_healthy_weight_gain(Ko_Execution):
     def __init__(self):
-        super().__init__(__package__, [self.get_pregnancy_healthy_weight_gain_recommendation])
+        super().__init__([self.get_pregnancy_healthy_weight_gain_recommendation])
 
     @staticmethod
     def get_pregnancy_healthy_weight_gain_recommendation(pregnant):
@@ -86,7 +86,7 @@ from kgrid_sdk import Ko_CLI
 
 class Abdominal_aortic_aneurysm_screening(Ko_API,Ko_CLI):
     def __init__(self):
-        super().__init__(__package__, [self.get_abdominal_aortic_aneurysm_screening])
+        super().__init__([self.get_abdominal_aortic_aneurysm_screening])
 ```
 
 These classes extend `Ko_Execution` and therefore they include the `execute` method to your knowledge object.
@@ -99,7 +99,7 @@ from kgrid_sdk import Ko_CLI
 
 class Abdominal_aortic_aneurysm_screening(Ko_API,Ko_CLI):
     def __init__(self):
-        super().__init__(__package__, [self.get_abdominal_aortic_aneurysm_screening])
+        super().__init__([self.get_abdominal_aortic_aneurysm_screening])
         self.add_endpoint("/check-inclusion", tags=["abdominal_aortic_aneurysm_screening"])
     
     @staticmethod
