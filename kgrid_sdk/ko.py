@@ -13,7 +13,7 @@ class Ko:
     
     @classmethod
     def get_version(cls, metadata_file=METADATA_FILE):
-        return cls.get_metadata().get("version", "Unknown version")
+        return cls.get_metadata().get("dc:version", "Unknown version")
     
     @classmethod
     def get_id(cls, metadata_file=METADATA_FILE):
