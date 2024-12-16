@@ -1,6 +1,8 @@
 
-kgrid/__pycache__/*
+kgrid_sdk/__pycache__/*
 tests/__pycache__/*
 
 .vscode/*
 .pypirc
+
+

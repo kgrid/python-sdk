@@ -23,10 +23,10 @@ You manage versioning in one central package. Compatibility between the core and
 
 The current version of the SDK only has optional dependencies for Ko_API class. If this class is used, these optional dependencies could be installed with the package using `-E api` if you are using `poetry install` or `poetry add` and using `[api]` if you are using `pip install`.
 
-## Usage
+## Create a python Knowledge Object
 You can use this package to implement python Knowledge Objects.
 
-### use  kgrid_sdk package as a dependency in your Knowledge Object
+### add  kgrid_sdk package as a dependency in your Knowledge Object
 The `kgrid_sdk` package is available on PyPI and can be easily added as a dependency to your project. Here’s how to include it in your project based on your setup:
 
 #### using Poetry
@@ -50,7 +50,7 @@ pip install kgrid_sdk
 ```
 pip install kgrid_sdk[api] 
 ```
-### `kgrid_sdk.Ko`
+### Use `kgrid_sdk.Ko`
 To inherit the core functionalities of the SDK, extend the `kgrid_sdk.Ko` class in your knowledge object. For example:
 ```python
 from kgrid_sdk import Ko
@@ -61,7 +61,7 @@ class Prevent_obesity_morbidity_mortality(Ko):
 ```
 This class adds core functionalities to the knowledge object (KO), such as `get_version` and `get_metadata`.
 
-### `kgrid_sdk.Ko_Execution`
+### Use `kgrid_sdk.Ko_Execution`
 The `Ko_Execution` class extends `Ko` to include a universal `execute` method for knowledge objects. The constructor of this class accepts an array of knowledge representations (functions), and the `execute` method can optionally take the name of the function to execute. If no function name is provided, the `execute` method defaults to executing the first function. This is particularly useful for KOs with only one knowledge representation. The knowledge representations could be added as static methods of the knowledge object class or could be defined as individual functions.
 ```python
 from kgrid_sdk import Ko_Execution
@@ -78,8 +78,8 @@ The `execute` method takes a JSON input, mapping it to the knowledge representat
 
 The `execute` method is used by the SDK's collection class, API, and CLI services.
 
-### `kgrid_sdk.Ko_API` and `kgrid_sdk.CLI`
-To implement an API or CLI service for your knowledge object, extend the `kgrid_sdk.Ko_API` and `kgrid_sdk.CLI` classes:
+### Use `kgrid_sdk.Ko_API` and `kgrid_sdk.Ko_CLI`
+To implement an API or CLI service for your knowledge object, extend the `kgrid_sdk.Ko_API` and `kgrid_sdk.Ko_CLI` classes:
 ```python
 from kgrid_sdk import Ko_API
 from kgrid_sdk import Ko_CLI
@@ -181,8 +181,8 @@ def apply(input):
 
 Note: The activator example requires a service specification file and a deployment file pointing to the `apply` method. For more details, refer to the [Python Activator](https://github.com/kgrid/python-activator) documentation.
 
-### `kgrid_sdk.Collection`
-The `kgrid_sdk.Collection` class can be used to create a collection of knowledge objects. Start by importing and creating an instance of the `Collection` class. Use the `add_knowledge_object` method to add knowledge objects that extend `kgrid_sdk.Ko_Execution` or higher-level SDK classes like `kgrid_sdk.Ko_API` or `kgrid_sdk.CLI`. This requirement ensures that the collection works with KOs containing the SDK `execute` method.
+## Create a collection using `kgrid_sdk.Collection`
+The `kgrid_sdk.Collection` class can be used to create a collection of knowledge objects. Start by importing and creating an instance of the `Collection` class. Use the `add_knowledge_object` method to add knowledge objects that extend `kgrid_sdk.Ko_Execution` or higher-level SDK classes like `kgrid_sdk.Ko_API` or `kgrid_sdk.Ko_CLI`. This requirement ensures that the collection works with KOs containing the SDK `execute` method.
 ```python
 from abdominal_aortic_aneurysm_screening import abdominal_aortic_aneurysm_screening
 from cardiovascular_prevention_diet_activity import cardiovascular_prevention_diet_activity
@@ -225,3 +225,30 @@ patient_data={
 result = USPSTF_Collection.calculate_for_all(patient_data)
 print(json.dumps(result, indent=4))
 ```
+
+## Metadata-Driven Packaging of a Knowledge Object
+Use the `package` CLI command to package the content of a Knowledge Object (KO) based on its metadata. 
+
+### Prerequisites
+To use the command line interface (CLI), you must install the CLI as an **_extra_**. Extras are optional dependencies that provide additional functionality. For this package, add `[cli]` to the end of the `.whl` package name and quote the entire package path.
+
+Install the CLI using pip, for example:
+
+```bash 
+pip install "kgrid-sdk[cli]@https://github.com/kgrid/python-sdk/releases/download/1.0/kgrid_sdk-1.2.0-py3-none-any.whl"
+```
+
+After installation, confirm that the CLI is installed and view the list of available commands by running:
+```bash
+kgrid-sdk --help    
+```
+### Packaging the Knowledge Object
+To package the content of the Knowledge Object using its metadata, run the following command:
+```bash
+kgrid-sdk package --metadata-path /path/to/metadata.json --output output.tar.gz
+```
+This command processes the specified metadata file and gathers all referenced content:
+- Knowledge Content: Extracted using the path defined by `koio:hasKnowledge -> implementedBy -> @id`.
+- Documentation: Extracted using paths defined by `koio:hasDocumentation -> @id`.
+
+The resulting package will be saved as a tar.gz file in the specified location.
