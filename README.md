@@ -48,7 +48,7 @@ pip install kgrid_sdk
 ```
 - To include the KO-API extra:
 ```
-pip install kgrid_sdk[api] 
+pip install "kgrid_sdk[api]" 
 ```
 ### Use `kgrid_sdk.Ko`
 To inherit the core functionalities of the SDK, extend the `kgrid_sdk.Ko` class in your knowledge object. For example:
@@ -227,12 +227,15 @@ print(json.dumps(result, indent=4))
 ```
 
 ## Metadata-Driven Packaging of a Knowledge Object
-Use the `package` CLI command to package the content of a Knowledge Object (KO) based on its metadata. 
+Use the `package` CLI command to package the content of a Knowledge Object (KO) based on its metadata. Currently, all relative and absolute local URIs in the metadata are resolved towards the location of the metadata, but external URLs are not included in the package. If a URI resolves to a folder, all contents within the folder are included; if it resolves to a file, only the file is included. By default, the metadata file is always included in the package.
 
 ### Prerequisites
-To use the command line interface (CLI), you must install the CLI as an **_extra_**. Extras are optional dependencies that provide additional functionality. For this package, add `[cli]` to the end of the `.whl` package name and quote the entire package path.
+To use the command line interface (CLI) from the kgrid_sdk package, you must install the CLI as an **_extra_**. Extras are optional dependencies that provide additional functionality. If you are installing the kgrid-sdk from PiPY use `[cli]` to install the CLI:
 
-Install the CLI using pip, for example:
+```bash
+pip install "kgrid-sdk[cli]"
+```
+If you are installing the package from a `.whl` file, add `[cli]` to the end of the `.whl` package name and quote the entire package path. for example:
 
 ```bash 
 pip install "kgrid-sdk[cli]@https://github.com/kgrid/python-sdk/releases/download/1.0/kgrid_sdk-1.2.0-py3-none-any.whl"
@@ -247,8 +250,13 @@ To package the content of the Knowledge Object using its metadata, run the follo
 ```bash
 kgrid-sdk package --metadata-path /path/to/metadata.json --output output.tar.gz
 ```
-This command processes the specified metadata file and gathers all referenced content:
-- Knowledge Content: Extracted using the path defined by `koio:hasKnowledge -> implementedBy -> @id`.
-- Documentation: Extracted using paths defined by `koio:hasDocumentation -> @id`.
 
-The resulting package will be saved as a tar.gz file in the specified location.
+This command processes the specified metadata file and gathers all referenced content. By default the metadata file is included in the package. The resulting package will be saved as a tar.gz file with the specified output location and name. `--metadata-path` and `--output` are optional. If `--metadata-path` is not provided the command will look for `metadata.json` in the current directory. If `--output` is not provided the name of the parent directory where the metadata file is located and the version name will be used as the name of the outpu file and the output package will be saved in the current directory. 
+
+By default all the file and folders will be added to the root of the package file. Use the option `--nested`to have all the files and folders copied in a folder in the created package with the name of the parent directory and the version. For example
+
+```bash
+kgrid-sdk package --metadata-path /path/to/metadata.json --nested
+```
+
+
