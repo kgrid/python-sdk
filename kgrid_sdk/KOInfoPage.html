@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Computable Artifact Metadata</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            display: flex;
+            width: 100%;
+        }
+        .left-column {
+            width: 70%;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+
+        /* Right Column */
+        .right-column {
+            width: 30%;
+            background-color: #e9e9e9;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .metadata {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .metadata p {
+            margin: 5px 0;
+        }
+        .doc-section, .test-section {
+            
+            right: 20px;
+            width: 250px;
+            color: black;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 250px;
+            font-size: 16px;
+        }
+        .doc-section {
+            top: 20px;
+            background-color: #97c8ed;
+        }
+        .doc-section h3 {
+            margin-top: 0;
+        }
+        .doc-section a {
+            text-decoration: underline;
+        }
+        .doc-section p {
+            margin-top: 5px;
+        }
+        
+        .test-section {
+            
+            background-color: #96d6b7;
+        }
+        .test-section h3 {
+            margin-top: 0;
+        }
+        
+        .test-section a {
+            text-decoration: underline;
+        }
+        
+        .test-section p {
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-column">
+            <div class="metadata" id="metadata">
+                <!-- Metadata will be loaded here dynamically -->
+            </div>            
+        </div>
+        <div class="right-column">
+            <div class="doc-section" id="doc-section">
+                <!-- Documentation links will be loaded here dynamically -->
+            </div>
+
+            <div class="test-section" id="test-section">
+                <!-- Test links will be loaded here dynamically -->
+            </div>
+        </div>
+</div>
+    <script src="https://cdn.jsdelivr.net/npm/jsonld@1.5.0/dist/jsonld.min.js"></script>
+    <script>
+        function findItem(obj, item, results = []) {
+            for (let key in obj) {
+                
+                if (key === item) {   
+                    results.push(...obj[key]);
+                } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                    findItem(obj[key], item, results);
+                }
+            }
+            return results;
+        }
+        (async () => {
+            //const metadata = JSON.parse(localStorage.getItem('metadata'));
+            const params = new URLSearchParams(window.location.search);
+            const metadata = JSON.parse(decodeURIComponent(params.get('data')));
+            const baseIRI = params.get('base')
+            // Use jsonld.js to expand the metadata
+            const expanded = await jsonld.expand(metadata, { base: baseIRI });
+            console.log('Expanded Metadata:', expanded[0]);
+            const metadataDiv = document.getElementById('metadata');
+            const docSection = document.getElementById('doc-section');
+            const testSection = document.getElementById('test-section');
+
+            metadataDiv.innerHTML = `
+                <h1>${metadata["dc:title"]}</h1> 
+                ${metadata["dc:description"].replace(/\n/g, "<br>") }<br/><br/>
+
+                <!-- <p><strong>Id:</strong> ${expanded[0]["@id"]}</p> -->
+                <p><strong>Id:</strong> ${metadata["@id"]}</p>
+                <p><strong>Identifier:</strong>  ${metadata["dc:identifier"] }</p>
+                <p><strong>Type:</strong> <a href='${expanded[0]["@type"]}'> ${metadata["@type"] }</a></p>
+                <p><strong>Version:</strong>  ${metadata["dc:version"] }</p>
+                <p><strong>Date:</strong>  ${metadata["dc:date"] }</p>
+                <p><strong>KGrid model version:</strong> ${metadata["koio:kgrid"]}</p>
+                <br/>
+
+                <h2>Creator Information</h2>
+                <p><strong>Name:</strong> ${metadata["schema:creator"]?.["schema:givenName"] ?? metadata["schema:creator"]?.["schema:name"] ?? "undefined"} ${metadata["schema:creator"]?.['schema:familyName']?? ""}</p>
+                <p><strong>Affiliation:</strong> ${metadata["schema:creator"]?.['schema:affiliation']?? "undefined"}</p>
+                <p><strong>Email:</strong> <a href="mailto:${metadata["schema:creator"]?.['schema:email']?? "undefined"}">${metadata["schema:creator"]?.['schema:email']?? "undefined"}</a></p>
+                <p><strong>ORCID:</strong> <a href="${metadata["schema:creator"]?.['@id']?? "undefined"}" target="_blank">${metadata["schema:creator"]?.['@id']?? "undefined"}</a></p>
+                <br/>
+
+                ${metadata["schema:contributor"]
+                ? `
+                <h2>Contributor Information</h2>
+                <p><strong>Name:</strong> ${metadata["schema:contributor"]?.['schema:givenName']?? "undefined"} ${metadata["schema:contributor"]?.['schema:familyName']?? "undefined"}</p>
+                <p><strong>Affiliation:</strong> ${metadata["schema:contributor"]?.['schema:affiliation']?? "undefined"}</p>
+                <p><strong>Email:</strong> <a href="mailto:${metadata["schema:contributor"]?.['schema:email']?? "undefined"}">${metadata["schema:contributor"]?.['schema:email']?? "undefined"}</a></p>
+                <p><strong>ORCID:</strong> <a href="${metadata["schema:contributor"]?.['@id']?? "undefined"}" target="_blank">${metadata["schema:contributor"]?.['@id']?? "undefined"}</a></p>
+                <br/>
+                `
+                : ""}
+                ${metadata["dc:publisher"]
+                ? `
+                <h2>Publisher Information</h2>
+                <p><strong>Publisher:</strong> ${metadata["dc:publisher"]}</p>
+                ${metadata["dc:license"] ? `<p><strong>License:</strong> ${metadata["dc:license"]}</p>` : ""}
+                ${metadata["dc:bibliographicCitation"] ? `<p><strong>Citation:</strong> ${metadata["dc:bibliographicCitation"]}</p>` : ""}
+                `
+                : ""}
+                
+            `;
+
+            // Iterate over the services and add a section for each
+            const services = metadata["koio:hasService"];
+            if (Array.isArray(services)) {
+                metadataDiv.innerHTML += '<h2> Services </h2>';
+                for (const service of services)  {   
+
+                    
+                    let serviceHTML ="";
+                    // Expand using jsonld.expand
+                        console.log(' Service:', service);
+                        const implementedByExpanded = await jsonld.expand(service["implementedBy"], { base: baseIRI });
+                        console.log('Expanded Service:', implementedByExpanded);
+                    
+                        serviceHTML = `
+                            <p><strong>Type:</strong> ${service["@type"].join(', ')}</p>
+                            <p><strong>Depends on:</strong><a href="#Knowledge"> ${service["dependsOn"]}</a></p>
+                            <p><strong>Implemented by:</strong> <a href="${implementedByExpanded[0]["@id"]}">${service["implementedBy"]["@id"]}</a> (type: ${service["implementedBy"]["@type"]})</p>
+                            <br/>
+                        `;
+                        // Append the service section to the metadataDiv
+                        metadataDiv.innerHTML += serviceHTML;
+
+
+                }
+            } else {
+                console.warn('The variable "services" is not an array or is undefined.');
+            }
+
+            metadataDiv.innerHTML += "<h2 id='Knowledge'> Knowledge </h2>";
+            const knowledges = metadata["koio:hasKnowledge"];
+            if (Array.isArray(knowledges)) {
+                for (const knowledge of knowledges)  {  
+                    const implementedByExpanded = await jsonld.expand(knowledge["implementedBy"], { base: baseIRI });
+                    let knowledgeHTML = `                    
+                        <p><h3> ${knowledge["@id"]}</h3></p>
+                        <p><strong>Type:</strong> ${knowledge["@type"]}</p>
+                        <p><strong>Implemented by:</strong> <a href="${implementedByExpanded[0]["@id"]}">${knowledge["implementedBy"]["@id"]} </a> (type: ${knowledge["implementedBy"]["@type"]})</p>
+                        ${knowledge["dc:source"] ? `<p><strong>Source:</strong><a href='${knowledge["dc:source"]}' target="_blank"> ${knowledge["dc:source"]}</a></p>` : ""}
+                        ${knowledge["dc:format"] ? `<p><strong>Format:</strong> ${knowledge["dc:format"]}</p>` : ""}
+                        ${knowledge["dc:date"] ? `<p><strong>Date:</strong> ${knowledge["dc:date"]}</p>` : ""}
+                        <b>Creator Information:</b>
+                        <p><strong>Name:</strong>  ${knowledge["schema:creator"]?.["schema:givenName"] ?? knowledge["schema:creator"]?.["schema:name"] ?? "undefined"} ${knowledge["schema:creator"]?.['schema:familyName']?? ""}</p>
+                        ${knowledge["schema:creator"]?.["schema:affiliation"] ? `<p><strong>Affiliation:</strong> ${knowledge["schema:creator"]["schema:affiliation"]}</p>` : ""}
+                        ${knowledge["schema:creator"]?.["schema:email"] ? `<p><strong>Email:</strong> <a href='mailto:${knowledge["schema:creator"]["schema:email"]}'>${knowledge["schema:creator"]["schema:email"]}</a></p>` : ""}
+                        ${knowledge["schema:creator"]?.["@id"] ? `<p><strong>ORCID:</strong> <a href="${knowledge["schema:creator"]?.["@id"]}" target="_blank">${knowledge["schema:creator"]?.["@id"]}</a></p>` : ""}
+
+                        <br/>
+                    `;
+
+                    // Append the service section to the metadataDiv
+                    metadataDiv.innerHTML += knowledgeHTML;
+                }
+            } else {
+                console.warn('The variable "services" is not an array or is undefined.');
+            }
+
+            const documentations = findItem(metadata, 'koio:hasDocumentation');
+            if (documentations && documentations.length > 0) {
+                let docHTML = `<h2>Documentation</h2>`;
+                for (const doc of documentations)  {  
+                    const docExpanded = await jsonld.expand(doc, { base: baseIRI });
+                    docHTML += `
+                        <h3><a href="${docExpanded[0]["@id"]}" target="_blank">${doc["dc:title"]}</a></h3>
+                        <p>${doc["dc:description"]}</p>
+                    `;
+                }
+                docSection.innerHTML = docHTML;
+            } else {
+                docSection.innerHTML = `<p>No documentation available</p>`;
+            }
+
+            const tests = findItem(metadata, 'koio:hasTest');
+            if (tests.length > 0) {
+                let testHTML = `<h2>Tests</h2>`;
+                for (const test of tests)  {  
+                    const testExpanded = await jsonld.expand(test, { base: baseIRI });
+                    
+                    testHTML += `
+                        <h3><a href="${testExpanded[0]["@id"]}" target="_blank">${test["dc:title"]}</a></h3>
+                        <p>${test["dc:description"]}</p>
+                    `;
+                }
+                testSection.innerHTML = testHTML;
+            } else {
+                testSection.innerHTML = `<p>No tests available</p>`;
+            }
+        })();
+    </script>
+</body>
+</html>
