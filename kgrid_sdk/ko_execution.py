@@ -28,3 +28,5 @@ class Ko_Execution(Ko):
         wrapper = self.create_wrapper(self.knowledges[knowledge_function] if knowledge_function else next(iter(self.knowledges.values())))
         
         return wrapper(input)
+        # fn = self.knowledges[knowledge_function] if knowledge_function else next(iter(self.knowledges.values()))
+        # return fn(**input) #possible solution without wrapper
