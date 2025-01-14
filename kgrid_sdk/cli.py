@@ -3,7 +3,10 @@ import json
 import tarfile
 from pathlib import Path
 from typing import Optional
+
 import typer
+from jinja2 import Template
+from pyld import jsonld
 
 cli = typer.Typer()
 
@@ -46,9 +49,7 @@ def package(
     cleaned_elements_to_package = filter_files(elements_to_package)
 
     if not output:
-        output = (
-            metadata_dir.name + "-" + metadata["dc:version"] + ".tar.gz"
-        )
+        output = metadata_dir.name + "-" + metadata["dc:version"] + ".tar.gz"
 
     # Create the .tar.gz archive
     with tarfile.open(
@@ -113,6 +114,278 @@ def filter_files(paths):
     return result
 
 
+@cli.command()
+def information_page(metadata_path: str = "metadata.json", output: str = "index.html"):
+    """creates knowledge object information page using metadata"""
+
+    # Load metadata JSON
+    with open(metadata_path, "r", encoding="utf-8") as f:
+        metadata = json.load(f)
+
+    # Expand metadata using JSON-LD
+    base_iri = "."
+    expanded_metadata = jsonld.expand(metadata, {"base": base_iri})
+
+    # Define the Jinja2 template
+    template = Template("""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ metadata.get("dc:title", "Metadata Page") }}</title>
+        <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            display: flex;
+            width: 100%;
+        }
+        .left-column {
+            width: 70%;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+
+        /* Right Column */
+        .right-column {
+            width: 30%;
+            background-color: #e9e9e9;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .metadata {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .metadata p {
+            margin: 5px 0;
+        }
+        .doc-section, .test-section {
+            
+            right: 20px;
+            width: 250px;
+            color: black;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 250px;
+            font-size: 16px;
+        }
+        .doc-section {
+            top: 20px;
+            background-color: #97c8ed;
+        }
+        .doc-section h3 {
+            margin-top: 0;
+        }
+        .doc-section a {
+            text-decoration: underline;
+        }
+        .doc-section p {
+            margin-top: 5px;
+        }
+        
+        .test-section {
+            
+            background-color: #96d6b7;
+        }
+        .test-section h3 {
+            margin-top: 0;
+        }
+        
+        .test-section a {
+            text-decoration: underline;
+        }
+        
+        .test-section p {
+            margin-top: 5px;
+        }
+    </style>
+    </head>
+    <body>
+        <div class="container">
+        <div class="left-column">
+            <div class="metadata" id="metadata">
+            <h1>{{ metadata.get("dc:title", "Untitled") }}</h1>
+            <p>{{ metadata.get("dc:description", "").replace("\n", "<br>") }}</p>
+            <p><strong>Id:</strong> {{ metadata.get("@id", "Undefined") }}</p>
+            <p><strong>Identifier:</strong> {{ metadata.get("dc:identifier", "Undefined") }}</p>
+            <p><strong>Type:</strong> <a href="{{ expanded_metadata[0].get('@type', [''])[0] }}">{{ metadata.get('@type', 'Undefined') }}</a></p>
+            <p><strong>Version:</strong> {{ metadata.get("dc:version", "Undefined") }}</p>
+            <p><strong>Date:</strong> {{ metadata.get("dc:date", "Undefined") }}</p>
+            {% if metadata.get("dc:source") %}
+                <p><strong>Source:</strong> 
+                    <a href="{{ metadata.get("dc:source", "Undefined") }}">
+                        {{ metadata.get("dc:source", "Undefined") }}
+                    </a>
+                </p>
+            {% endif %}
+
+            <h2>Creator Information</h2>
+            <p><strong>Name:</strong> {{ metadata.get("schema:creator", {}).get("schema:givenName", "") }}
+                {{ metadata.get("schema:creator", {}).get("schema:familyName", "") }} {{ metadata.get("schema:creator", {}).get("schema:name", "") }}</p>
+            <p><strong>Affiliation:</strong> {{ metadata.get("schema:creator", {}).get("schema:affiliation", "Undefined") }}</p>
+            <p><strong>Email:</strong> 
+                <a href="mailto:{{ metadata.get('schema:creator', {}).get('schema:email', 'Undefined') }}">
+                    {{ metadata.get('schema:creator', {}).get('schema:email', 'Undefined') }}
+                </a>
+            </p>
+            <p><strong>Website:</strong> 
+                <a href="{{ metadata.get('schema:creator', {}).get('@id', 'Undefined') }}">
+                    {{ metadata.get('schema:creator', {}).get('@id', 'Undefined') }}
+                </a>
+            </p>
+
+            {% if metadata.get("koio:hasService") %}
+            <h2>Services</h2>
+            {% for service in metadata.get("koio:hasService", []) %}
+                <p><strong>Type:</strong> {{ service.get("@type", ["Undefined"])[0] }}</p>
+                <p><strong>Depends on:</strong> {{ service.get("dependsOn", "Undefined") }}</p>
+                <p><strong>Implemented by:</strong> 
+                    <a href="{{ service.get("implementedBy", {}).get("@id", "Undefined") }}">
+                        {{ service.get("implementedBy", {}).get("@id", "Undefined") }}
+                    </a>
+                </p>
+            {% endfor %}
+            {% endif %}
+            
+            
+            {% if metadata.get("koio:hasKnowledge") %}
+            <h2>Knowledge</h2>
+            {% for knowledge in metadata.get("koio:hasKnowledge", []) %}
+                <p><h3> {{ knowledge.get("@id", ["Undefined"]) }}</h3></p>
+                <p><strong>Type:</strong> {{ knowledge.get("@type", ["Undefined"]) }}</p>
+                <p><strong>Implemented by:</strong> 
+                    <a href="{{ knowledge.get("implementedBy", {}).get("@id", "Undefined") }}">
+                        {{ knowledge.get("implementedBy", {}).get("@id", "Undefined") }}
+                    </a>(type: {{ knowledge.get("implementedBy", {}).get("@type", "Undefined") }})
+                </p>
+                {% if knowledge.get("dc:source") %}
+                <p><strong>Source:</strong> 
+                    <a href="{{ knowledge.get("dc:source", "Undefined") }}">
+                        {{ knowledge.get("dc:source", "Undefined") }}
+                    </a>
+                </p>
+                {% endif %}
+                {% if knowledge.get("dc:format") %}
+                <p><strong>Format:</strong> 
+                    {{ knowledge.get("dc:format", "Undefined") }}
+                </p>
+                {% endif %}
+                {% if knowledge.get("dc:date") %}
+                <p><strong>Date:</strong> 
+                    {{ knowledge.get("dc:date", "Undefined") }}
+                </p>
+                {% endif %}
+                <b>Creator Information:</b>
+                <p><strong>Name:</strong> 
+                   {{ knowledge.get("schema:creator", {}).get("schema:givenName", "") }} {{ knowledge.get("schema:creator", {}).get("schema:lastName", "") }} {{ knowledge.get("schema:creator", {}).get("schema:name", "") }}
+                </p>
+                {% if knowledge.get("schema:creator", {}).get("schema:affiliation")%}
+                <p><strong>Affiliation:</strong> 
+                   {{ knowledge.get("schema:creator", {}).get("schema:affiliation", "") }} 
+                </p>
+                {% endif %}
+                {% if knowledge.get("schema:creator", {}).get("schema:email")%}
+                <p><strong>Email:</strong> 
+                    <a href="mailto:{{ knowledge.get("schema:creator", {}).get("schema:email", "Undefined") }}">
+                        {{ knowledge.get("schema:creator", {}).get("schema:email", "Undefined") }}
+                    </a>
+                </p>
+                {% endif %}
+                {% if knowledge.get("schema:creator", {}).get("@id")%}
+                <p><strong>Website:</strong> 
+                    <a href="mailto:{{ knowledge.get("schema:creator", {}).get("@id", "Undefined") }}">
+                        {{ knowledge.get("schema:creator", {}).get("@id", "Undefined") }}
+                    </a>
+                </p>
+                {% endif %}
+            {% endfor %}
+            {% endif %}
+        </div>            
+        </div>
+        <div class="right-column">
+            <div class="doc-section" id="doc-section">
+            {% if documentation %}
+                <h2>Documentation</h2>
+                {% for doc in documentation %}
+                    <h3><a href="{{ doc.get('@id', '#') }}">{{ doc.get('dc:title', 'Untitled') }}</a></h3>
+                    <p>{{ doc.get('dc:description', 'No description') }}</p>
+                {% endfor %}
+            {% else %}
+                <p>No documentation available</p>
+            {% endif %}
+        </div>
+
+            <div class="test-section" id="test-section">
+            {% if tests %}
+                <h2>Tests</h2>
+                {% for test in tests %}
+                    <h3><a href="{{ test.get('@id', '#') }}">{{ test.get('dc:title', 'Untitled') }}</a></h3>
+                    <p>{{ test.get('dc:description', 'No description') }}</p>
+                {% endfor %}
+            {% else %}
+                <p>No tests available</p>
+            {% endif %}
+            </div>
+        </div>
+        </div>
+    </body>
+    </html>
+    """)
+
+    results = []
+    # Find documentation and tests
+    documentation = find_item(metadata, "koio:hasDocumentation", results)
+    results = []
+    tests = find_item(metadata, "koio:hasTest", results)
+
+    # Render the template
+    html = template.render(
+        metadata=metadata,
+        expanded_metadata=expanded_metadata,
+        documentation=documentation,
+        tests=tests,
+    )
+    with open(output, "w") as f:
+        f.write(html)
+
+    print(f"Knowledge object information page created at {output}")
+
+
+def find_item(obj, key, results: list):
+    """Recursively find all items with the given key in a nested dictionary."""
+
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == key:
+                if isinstance(v, (list)):
+                    for item in v:
+                        results.append(item)
+                else:
+                    results.append(v)
+            elif isinstance(v, (dict, list)):
+                results = find_item(v, key, results)
+    elif isinstance(obj, list):
+        for item in obj:
+            results = find_item(item, key, results)
+    return results
+
+
 # package("", nested=True)
+# informationPage("/home/faridsei/dev/test/knowledgebase/MPOG/metadata.json","index2.html")
 if __name__ == "__main__":
     cli()

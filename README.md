@@ -226,7 +226,7 @@ result = USPSTF_Collection.calculate_for_all(patient_data)
 print(json.dumps(result, indent=4))
 ```
 
-## Metadata-Driven Packaging of a Knowledge Object
+## Metadata-Driven Packaging and Information Page of a Knowledge Object
 Use the `package` CLI command to package the content of a Knowledge Object (KO) based on its metadata. Currently, all relative and absolute local URIs in the metadata are resolved towards the location of the metadata, but external URLs are not included in the package. If a URI resolves to a folder, all contents within the folder are included; if it resolves to a file, only the file is included. By default, the metadata file is always included in the package.
 
 ### Prerequisites
@@ -238,7 +238,7 @@ pip install "kgrid-sdk[cli]"
 If you are installing the package from a `.whl` file, add `[cli]` to the end of the `.whl` package name and quote the entire package path. for example:
 
 ```bash 
-pip install "kgrid-sdk[cli]@https://github.com/kgrid/python-sdk/releases/download/1.0/kgrid_sdk-1.2.0-py3-none-any.whl"
+pip install "kgrid-sdk[cli]@https://github.com/kgrid/python-sdk/releases/download/1.0/kgrid_sdk-1.3.0-py3-none-any.whl"
 ```
 
 After installation, confirm that the CLI is installed and view the list of available commands by running:
@@ -258,5 +258,13 @@ By default all the file and folders will be added to the root of the package fil
 ```bash
 kgrid-sdk package --metadata-path /path/to/metadata.json --nested
 ```
+
+### Knowledge Object Information Page
+To generate an information page for a Knowledge Object using its metadata, use the following command:
+```bash
+kgrid-sdk information-page --metadata-path /path/to/metadata.json --output /path/to/index.html
+```
+
+This command processes the specified metadata file to create an information page, including relative links to resources such as services and knowledge.`--metadata-path` specifies the path to the metadata file. If not provided, the command will look for a file named `metadata.json` in the current directory. `--output` specifies the output path and file name for the generated information page. If not provided, the page will be saved as `index.html` in the current directory. 
 
 
