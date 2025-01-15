@@ -1,0 +1,76 @@
+{
+  "@context": "https://kgrid.org/koio/2.0/context",
+  "@id": "KO_Id",
+  "koio:kgrid": "2",
+  "@type": "koio:KnowledgeObject",
+  "dc:title": "KO_Title",
+  "dc:identifier": "ark:KO_Identifier",
+  "dc:version": "KO_Version",
+  "dc:date": "KO_CreationDate",
+  "dc:description": "KO_Description",
+  "schema:creator": {
+    "@id": "KO_CreatorWebSite",
+    "@type": "team",
+    "schema:name": "KO_CreatorName",
+    "schema:affiliation": "KO_CreatorAffiliation",
+    "schema:email": "KO_CreatorEmail"
+  },
+  "dc:publisher": "KO_Pubmisher",
+  "dc:type": "software",
+  "dc:license": "KO_LicenseFile",  
+  "koio:hasService": [
+    {
+      "@type": [
+        "KO_ServiceType"
+      ],
+      "dependsOn": "KO_KnowlegeId",
+      "implementedBy": {
+        "@id": "KO_ServicePath",
+        "@type": [
+          "KO_ServiceImplementationType"
+        ]
+      }
+    }
+  ],
+  "koio:hasKnowledge": [
+    {
+      "@id": "KO_KnowledgeId",
+      "@type": "koio:Knowledge",
+      "implementedBy": {
+        "@id": "KO_KnowledgeImplementationPath",
+        "@type": "Function"
+      },
+      "dc:source":"KO_KnowLedgeSource",
+      "dc:format": "text/html",
+      "dc:date": "KO_KnowledgeCreationDate",
+      "schema:creator": {
+        "@type": "Organization",
+        "schema:name": "KO_KnwoledgeCreatorName"
+      },
+      "koio:hasTest": [
+        {
+          "@id": "KO_KnowledgeTestPath",
+          "dc:title": "KO_KnowledgeTestTitle",
+          "@type": "koio:Test",
+          "dc:description": "KO_KnowledgeTestDescription"
+        }
+      ],
+      "koio:hasDocumentation": [
+        {
+          "@id": "KO_KnowledgeDocumentationPath",
+          "@type": "koio:Documentation",
+          "dc:title": "KO_KnowledgeDocumentationTitle",
+          "dc:description": "KO_KnowledgeDocumentationDescription"
+        }
+      ]
+    }
+  ],
+  "koio:hasDocumentation": [
+    {
+      "@id": "KO_DocumentationPath",
+      "@type": "koio:Documentation",
+      "dc:title": "KO_DocumentationTitle",
+      "dc:description": "KO_DocumentationDescription"
+    }
+  ]
+}

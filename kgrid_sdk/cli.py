@@ -1,5 +1,6 @@
 import importlib.metadata
 import json
+import os
 import tarfile
 from pathlib import Path
 from typing import Optional
@@ -7,6 +8,7 @@ from typing import Optional
 import typer
 from jinja2 import Template
 from pyld import jsonld
+from datetime import datetime
 
 cli = typer.Typer()
 
@@ -32,7 +34,13 @@ def no_command(
 def package(
     metadata_path: str = "metadata.json", output: str = None, nested: bool = False
 ):
-    """packages the content of the given path using metadata"""
+    """
+    packages the content of the given path using metadata.
+    
+    param metadata-path(str): The location of the metadata file. Defaults to metadata.json in the current directory.
+    param output(str): Location and name to create the package. If it is not provided the name of the parent directory where the metadata file is located and the version name will be used as the name of the output file and the output package will be saved in the current directory.
+    param nested(bool): Use this option to have all the files and folders copied in a folder in the created package with the name of the parent directory and the version. By default all the file and folders will be added to the root of the package file.
+    """
 
     # Resolve the directory of the metadata file
     metadata_dir = Path(metadata_path).parent.resolve()
@@ -116,7 +124,12 @@ def filter_files(paths):
 
 @cli.command()
 def information_page(metadata_path: str = "metadata.json", output: str = "index.html"):
-    """creates knowledge object information page using metadata"""
+    """
+    creates knowledge object information page using metadata
+    
+    param metadata_path(str): Specifies the path to the metadata file. If not provided, the command will look for a file named `metadata.json` in the current directory.
+    param output(str): Specifies the output path and file name for the generated information page. If not provided, the page will be saved as `index.html` in the current directory.
+    """
 
     # Load metadata JSON
     with open(metadata_path, "r", encoding="utf-8") as f:
@@ -226,6 +239,12 @@ def information_page(metadata_path: str = "metadata.json", output: str = "index.
             <p><strong>Type:</strong> <a href="{{ expanded_metadata[0].get('@type', [''])[0] }}">{{ metadata.get('@type', 'Undefined') }}</a></p>
             <p><strong>Version:</strong> {{ metadata.get("dc:version", "Undefined") }}</p>
             <p><strong>Date:</strong> {{ metadata.get("dc:date", "Undefined") }}</p>
+            {% if metadata.get("dc:license") %}
+            <p><strong>License:</strong> 
+                    <a href="{{ metadata.get("dc:license", "Undefined") }}">
+                        {{ metadata.get("dc:license", "Undefined") }}
+                    </a></p>
+            {% endif %}
             {% if metadata.get("dc:source") %}
                 <p><strong>Source:</strong> 
                     <a href="{{ metadata.get("dc:source", "Undefined") }}">
@@ -384,8 +403,67 @@ def find_item(obj, key, results: list):
             results = find_item(item, key, results)
     return results
 
+@cli.command()
+def init(name: str):
+    """
+    Adds metadata, readme, license and KO information page to a ko folder.
+    
+    :param name: Knowledge Object name.
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    template_path = os.path.join(script_dir, "templates", "metadata.json")
+    
+    
+    with open(template_path, "r") as file:
+        metadata = json.load(file)
+    
+    # Update the KO_Title
+    metadata["@id"] = name.replace(" ", "-").replace("_", "-")
+    metadata["dc:title"] = name
+    metadata["dc:date"] = datetime.now().strftime("%Y-%m-%d")
+    metadata["dc:version"] = "v1.0"
+    metadata["dc:identifier"] = "ark:"+ metadata["@id"]
+    metadata["dc:license"] = "license.md"
+    metadata["koio:hasDocumentation"][0]["@id"] = "README.md"
+    metadata["koio:hasDocumentation"][0]["dc:title"] = "README.md"
+    metadata["koio:hasDocumentation"][0]["dc:description"] = "KO readme file."
+    metadata["koio:hasDocumentation"].append({
+            "@id": "index.html",
+            "@type": "koio:Documentation",
+            "dc:title": "Knowledge Object Information Page",
+            "dc:description": "Knowledge object information page."
+        })
+    
+    # Determine the output path
+    save_path = os.getcwd()
+    metadata_file = os.path.join(save_path, "metadata.json")
+    
+    # Save the modified metadata
+    with open(metadata_file, "w") as file:
+        json.dump(metadata, file, indent=4)
+    
+    print(f"Metadata file saved at {metadata_file}")
+    
+    license_file = os.path.join(save_path, "license.md")
+    with open(license_file, "w") as file:
+        file.write("KO's license content goes here.")
+        
+    print(f"License file saved at {license_file}")
+        
+    readme_file = os.path.join(save_path, "README.md")
+    with open(readme_file, "w") as file:
+        file.write("KO's readme content goes here.")
+    
+    print(f"Readme file saved at {readme_file}")
+
+    KOInfo_page = os.path.join(save_path, "index.html")
+    information_page(os.path.join(save_path, "metadata.json"),KOInfo_page)
+    
+    #print(f"Knowledge object information page saved at {KOInfo_page}")
+    
 
 # package("", nested=True)
-# informationPage("/home/faridsei/dev/test/knowledgebase/MPOG/metadata.json","index2.html")
+#information_page("/home/faridsei/dev/code/knowledge-base/metadata.json","/home/faridsei/dev/code/knowledge-base/index.html")
+#init("test")
 if __name__ == "__main__":
     cli()

@@ -226,10 +226,12 @@ result = USPSTF_Collection.calculate_for_all(patient_data)
 print(json.dumps(result, indent=4))
 ```
 
-## Metadata-Driven Packaging and Information Page of a Knowledge Object
-Use the `package` CLI command to package the content of a Knowledge Object (KO) based on its metadata. Currently, all relative and absolute local URIs in the metadata are resolved towards the location of the metadata, but external URLs are not included in the package. If a URI resolves to a folder, all contents within the folder are included; if it resolves to a file, only the file is included. By default, the metadata file is always included in the package.
 
-### Prerequisites
+
+## KGrid CLI
+KGrid CLI offers a range of commands to assist with creating, representing, and packaging Knowledge Objects.
+
+### Installation
 To use the command line interface (CLI) from the kgrid_sdk package, you must install the CLI as an **_extra_**. Extras are optional dependencies that provide additional functionality. If you are installing the kgrid-sdk from PiPY use `[cli]` to install the CLI:
 
 ```bash
@@ -238,17 +240,40 @@ pip install "kgrid-sdk[cli]"
 If you are installing the package from a `.whl` file, add `[cli]` to the end of the `.whl` package name and quote the entire package path. for example:
 
 ```bash 
-pip install "kgrid-sdk[cli]@https://github.com/kgrid/python-sdk/releases/download/1.0/kgrid_sdk-1.3.0-py3-none-any.whl"
+pip install "kgrid-sdk[cli]@https://github.com/kgrid/python-sdk/releases/download/1.0/kgrid_sdk-1.4.0-py3-none-any.whl"
 ```
 
 After installation, confirm that the CLI is installed and view the list of available commands by running:
 ```bash
-kgrid-sdk --help    
+kgrid --help    
 ```
-### Packaging the Knowledge Object
+
+### Initiate a KGrid Knowledge Object
+Use the `init` command to add essential KGrid files, including metadata, to the current directory:
+```bash
+kgrid init {name} 
+```
+
+This command creates the following files in the current directory: `metadata.json`, `README.md`, `license.md`, and a Knowledge Object information page (`index.html`). The `name` parameter specifies the name of the Knowledge Object.
+- The `metadata.json` file includes basic metadata.
+- The information page reflects the metadata.
+The `README.md` and `license.md` files are generated as empty files.
+
+### Knowledge Object Information Page
+To generate an information page for a Knowledge Object using its metadata, use the following command:
+```bash
+kgrid information-page --metadata-path /path/to/metadata.json --output /path/to/index.html
+```
+
+This command processes the specified metadata file to create an information page, including relative links to resources such as services and knowledge.`--metadata-path` specifies the path to the metadata file. If not provided, the command will look for a file named `metadata.json` in the current directory. `--output` specifies the output path and file name for the generated information page. If not provided, the page will be saved as `index.html` in the current directory. 
+
+
+### Metadata-Driven Packaging of a Knowledge Object
+Use the `package` CLI command to package the content of a Knowledge Object (KO) based on its metadata. Currently, all relative and absolute local URIs in the metadata are resolved towards the location of the metadata, but external URLs are not included in the package. If a URI resolves to a folder, all contents within the folder are included; if it resolves to a file, only the file is included. By default, the metadata file is always included in the package.
+
 To package the content of the Knowledge Object using its metadata, run the following command:
 ```bash
-kgrid-sdk package --metadata-path /path/to/metadata.json --output output.tar.gz
+kgrid package --metadata-path /path/to/metadata.json --output output.tar.gz
 ```
 
 This command processes the specified metadata file and gathers all referenced content. By default the metadata file is included in the package. The resulting package will be saved as a tar.gz file with the specified output location and name. `--metadata-path` and `--output` are optional. If `--metadata-path` is not provided the command will look for `metadata.json` in the current directory. If `--output` is not provided the name of the parent directory where the metadata file is located and the version name will be used as the name of the outpu file and the output package will be saved in the current directory. 
@@ -256,15 +281,8 @@ This command processes the specified metadata file and gathers all referenced co
 By default all the file and folders will be added to the root of the package file. Use the option `--nested`to have all the files and folders copied in a folder in the created package with the name of the parent directory and the version. For example
 
 ```bash
-kgrid-sdk package --metadata-path /path/to/metadata.json --nested
+kgrid package --metadata-path /path/to/metadata.json --nested
 ```
 
-### Knowledge Object Information Page
-To generate an information page for a Knowledge Object using its metadata, use the following command:
-```bash
-kgrid-sdk information-page --metadata-path /path/to/metadata.json --output /path/to/index.html
-```
-
-This command processes the specified metadata file to create an information page, including relative links to resources such as services and knowledge.`--metadata-path` specifies the path to the metadata file. If not provided, the command will look for a file named `metadata.json` in the current directory. `--output` specifies the output path and file name for the generated information page. If not provided, the page will be saved as `index.html` in the current directory. 
 
 
