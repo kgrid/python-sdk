@@ -54,8 +54,13 @@ def package(
     for relative_path in ids:
         full_path = metadata_dir / Path(relative_path)
         elements_to_package.append(full_path)
+        
+    if metadata["dc:license"]:
+        elements_to_package.append(metadata_dir / metadata["dc:license"])    
     cleaned_elements_to_package = filter_files(elements_to_package)
 
+
+    
     if not output:
         output = metadata_dir.name + "-" + metadata["dc:version"] + ".tar.gz"
 
@@ -462,7 +467,7 @@ def init(name: str):
     #print(f"Knowledge object information page saved at {KOInfo_page}")
     
 
-# package("", nested=True)
+package("/home/faridsei/dev/code/knowledge-base/metadata.json", nested=True)
 #information_page("/home/faridsei/dev/code/knowledge-base/metadata.json","/home/faridsei/dev/code/knowledge-base/index.html")
 #init("test")
 if __name__ == "__main__":
