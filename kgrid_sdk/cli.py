@@ -467,7 +467,7 @@ def init(name: str):
     #print(f"Knowledge object information page saved at {KOInfo_page}")
     
 
-package("/home/faridsei/dev/code/knowledge-base/metadata.json", nested=True)
+# package("/home/faridsei/dev/code/knowledge-base/metadata.json", nested=True)
 #information_page("/home/faridsei/dev/code/knowledge-base/metadata.json","/home/faridsei/dev/code/knowledge-base/index.html")
 #init("test")
 if __name__ == "__main__":
