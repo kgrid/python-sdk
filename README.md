@@ -265,7 +265,13 @@ To generate an information page for a Knowledge Object using its metadata, use t
 kgrid information-page --metadata-path /path/to/metadata.json --output /path/to/index.html
 ```
 
-This command processes the specified metadata file to create an information page, including relative links to resources such as services and knowledge.`--metadata-path` specifies the path to the metadata file. If not provided, the command will look for a file named `metadata.json` in the current directory. `--output` specifies the output path and file name for the generated information page. If not provided, the page will be saved as `index.html` in the current directory. 
+This command processes the specified metadata file to create an information page, including links to resources such as services and knowledge.
+
+#### Parameters
+- `--metadata-path`: It specifies the path to the metadata file. If not provided, the command will look for a file named `metadata.json` in the current directory. 
+- `--output`: It specifies the output path and file name for the generated information page. If not provided, the page will be saved as `index.html` in the current directory. 
+- `--include_relative_paths`: By default, the generated information page includes links to resources such as services and knowledge on the GitHub repository and the branch corresponding to the path where the metadata is located. If the location is not a cloned GitHub repository, or if it is overridden using `--include_relative_paths`, relative paths to resources will be included, pointing to the location where the metadata is stored.
+
 
 
 ### Metadata-Driven Packaging of a Knowledge Object
@@ -273,12 +279,15 @@ Use the `package` CLI command to package the content of a Knowledge Object (KO) 
 
 To package the content of the Knowledge Object using its metadata, run the following command:
 ```bash
-kgrid package --metadata-path /path/to/metadata.json --output output.tar.gz
+kgrid package --metadata-path /path/to/metadata.json --output output.tar.gz 
 ```
 
-This command processes the specified metadata file and gathers all referenced content. By default the metadata file is included in the package. The resulting package will be saved as a tar.gz file with the specified output location and name. `--metadata-path` and `--output` are optional. If `--metadata-path` is not provided the command will look for `metadata.json` in the current directory. If `--output` is not provided the name of the parent directory where the metadata file is located and the version name will be used as the name of the outpu file and the output package will be saved in the current directory. 
+This command processes the specified metadata file and gathers all referenced content. By default the metadata file is included in the package. The resulting package will be saved as a tar.gz file with the specified output location and name. `--metadata-path`, `--output` are optional. 
 
-By default all the file and folders will be added to the root of the package file. Use the option `--nested`to have all the files and folders copied in a folder in the created package with the name of the parent directory and the version. For example
+#### Parameters
+- `--metadata-path`: If `--metadata-path` is not provided the command will look for `metadata.json` in the current directory. 
+- `--output`: If `--output` is not provided the name of the parent directory where the metadata file is located and the version name will be used as the name of the outpu file and the output package will be saved in the current directory. 
+- `--nested`: By default all the file and folders will be added to the root of the package file. Use the option `--nested`to have all the files and folders copied in a folder in the created package with the name of the parent directory and the version. For example
 
 ```bash
 kgrid package --metadata-path /path/to/metadata.json --nested

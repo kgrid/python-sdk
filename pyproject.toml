@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kgrid_sdk"
-version = "1.4.2"
+version = "1.5.0"
 description = "SDK for KGrid 2.0 Knowledge objects"
 authors = ["KGrid Developers <kgrid-developers@umich.edu>"]
 readme = "README.md"
@@ -12,6 +12,8 @@ fastapi = { version = "^0.115.4", optional = true }
 typer = {version="^0.15.1", optional=true}
 pyld = "^2.0.4"
 jinja2 = "^3.1.5"
+gitpython = "^3.1.44"
+requests = "^2.32.3"
 
 [tool.poetry.extras]
 api = ["fastapi"]
