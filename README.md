@@ -240,7 +240,7 @@ pip install "kgrid-sdk[cli]"
 If you are installing the package from a `.whl` file, add `[cli]` to the end of the `.whl` package name and quote the entire package path. for example:
 
 ```bash 
-pip install "kgrid-sdk[cli]@https://github.com/kgrid/python-sdk/releases/download/1.0/kgrid_sdk-1.4.0-py3-none-any.whl"
+pip install "kgrid-sdk[cli]@https://github.com/kgrid/python-sdk/releases/download/1.0/kgrid_sdk-1.5.0-py3-none-any.whl"
 ```
 
 After installation, confirm that the CLI is installed and view the list of available commands by running:

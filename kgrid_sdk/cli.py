@@ -5,11 +5,12 @@ import tarfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 import git
 import requests
 import typer
-from jinja2 import Template
+from jinja2 import Environment
 from pyld import jsonld
 
 cli = typer.Typer()
@@ -129,6 +130,14 @@ def filter_files(paths):
     return result
 
 
+# Define a custom filter to extract the filename from a URL or path
+def get_filename(url):
+    if url:
+        parsed_url = urlparse(url)
+        return os.path.basename(parsed_url.path)
+    return "undefined"
+
+
 @cli.command()
 def information_page(
     metadata_path: str = "metadata.json",
@@ -168,8 +177,10 @@ def information_page(
     if base_iri and not includ_relative_paths:
         metadata = expand_ids(metadata, {"base": base_iri, "expandContext": context})
 
+    env = Environment()
+    env.filters["filename"] = get_filename
     # Jinja2 template
-    template = Template("""
+    template = env.from_string("""
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -263,15 +274,15 @@ def information_page(
             <div class="metadata" id="metadata">
             <h1>{{ metadata.get("dc:title", "Untitled") }}</h1>
             <p>{{ metadata.get("dc:description", "").replace("\n", "<br>") }}</p>
-            <p><strong>Id:</strong> {{ metadata.get("@id", "Undefined") }}</p>
+            <p><strong>Id:</strong> {{ metadata.get("@id", "Undefined").replace("_:","") }}</p>
             <p><strong>Identifier:</strong> {{ metadata.get("dc:identifier", "Undefined") }}</p>
             <p><strong>Type:</strong> <a href="{{ expanded_metadata[0].get('@type', [''])[0] }}" target='_blank'>{{ metadata.get('@type', 'Undefined') }}</a></p>
             <p><strong>Version:</strong> {{ metadata.get("dc:version", "Undefined") }}</p>
             <p><strong>Date:</strong> {{ metadata.get("dc:date", "Undefined") }}</p>
             {% if metadata.get("dc:license") %}
             <p><strong>License:</strong> 
-                    <a href="{{ metadata.get("dc:license", "Undefined") }}" target='_blank'>
-                        {{ metadata.get("dc:license", "Undefined") }}
+                    <a href="{{ metadata.get("dc:license", {}).get("@id", "undefined") }}" target='_blank'>
+                        {{ metadata.get("dc:license", {}).get("@id", "undefined")| filename }}
                     </a></p>
             {% endif %}
             {% if metadata.get("dc:source") %}
@@ -281,7 +292,7 @@ def information_page(
                     </a>
                 </p>
             {% endif %}
-
+            <hr>
             <h2>Creator Information</h2>
             <p><strong>Name:</strong> {{ metadata.get("schema:creator", {}).get("schema:givenName", "") }}
                 {{ metadata.get("schema:creator", {}).get("schema:familyName", "") }} {{ metadata.get("schema:creator", {}).get("schema:name", "") }}</p>
@@ -298,26 +309,35 @@ def information_page(
             </p>
 
             {% if metadata.get("koio:hasService") %}
+            <hr>
             <h2>Services</h2>
             {% for service in metadata.get("koio:hasService", []) %}
+                <p><h3> {{ service.get("@id", "").replace("_:","") }}</h3></p>
                 <p><strong>Type:</strong> {{ service.get("@type", ["Undefined"])[0] }}</p>
                 <p><strong>Depends on:</strong> {{ service.get("dependsOn", "Undefined") }}</p>
                 <p><strong>Implemented by:</strong> 
-                    <a href="{{ service.get("implementedBy", {}).get("@id", "Undefined") }}" target='_blank'>
-                        {{ service.get("implementedBy", {}).get("@id", "Undefined") }}
-                    </a>
+                    {% if service.get("implementedBy", {}).get("@id", "Undefined") | filename == "" or service.get("implementedBy", {}).get("@id", "Undefined") | filename == "." %}
+                        <a href="{{ service.get("implementedBy", {}).get("@id", "Undefined") }}" target='_blank'>
+                            {{ service.get("@id", "").replace("_:","")}}
+                        </a>
+                    {% else%}
+                        <a href="{{ service.get("implementedBy", {}).get("@id", "Undefined") }}" target='_blank'>
+                            {{ service.get("implementedBy", {}).get("@id", "Undefined") | filename}}
+                        </a>                                 
+                    {% endif %}                     
                 </p>
             {% endfor %}
             {% endif %}
             
             
             {% if metadata.get("koio:hasKnowledge") %}
+            <hr>
             <h2>Knowledge</h2>
             {% for knowledge in metadata.get("koio:hasKnowledge", []) %}
-                <p><h3> {{ knowledge.get("@id", ["Undefined"]) }}</h3></p>
+                <p><h3> {{ knowledge.get("@id", "").replace("_:","") }}</h3></p>
                 <p><strong>Type:</strong> {{ knowledge.get("@type", ["Undefined"]) }}</p>
                 {% if knowledge.get("dc:description") %}
-                    <p><strong>Description:</strong> {{ knowledge.get("dc:description", ["Undefined"]) }}</p>
+                    <p><strong>Description:</strong> {{ knowledge.get("dc:description", "") }}</p>
                 {% endif %}
                 {% set implemented_by = knowledge.get("implementedBy", [{}]) %}
                 {% set implemented_by = [implemented_by] if implemented_by is mapping else implemented_by %}
@@ -326,7 +346,7 @@ def information_page(
                 {% for implementation in implemented_by %}
                     <li>
                     <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank'>
-                        {{ implementation.get("@id", "Undefined") }}
+                        {{ implementation.get("@id", "Undefined") | filename}}
                     </a>(type: {{ implementation.get("@type", "Undefined") }})
                     </li>
                 {% endfor %}
@@ -464,9 +484,13 @@ def find_item(obj, key, results: list):
     return results
 
 
-def get_github_branch_url(folder_path):
+def get_github_branch_url(file_path):
     try:
+        folder_path = os.path.dirname(file_path)
+
         repo = git.Repo(folder_path, search_parent_directories=True)
+        repo_root = repo.working_tree_dir
+        relative_path = os.path.relpath(file_path, repo_root)
 
         # Get the remote URL (origin)
         origin_url = repo.remotes.origin.url if repo.remotes else None
@@ -483,12 +507,9 @@ def get_github_branch_url(folder_path):
                 origin_url = origin_url.replace(
                     "git@github.com:", "https://github.com/"
                 )
-            elif origin_url.startswith("https://github.com/"):
-                # If the origin URL is already HTTPS format
-                pass
 
             # Construct the full URL to the current branch
-            branch_url = f"{origin_url}/tree/{branch}/"
+            branch_url = f"{origin_url}/blob/{branch}/{relative_path}"
             return branch_url
         else:
             return None
@@ -554,8 +575,9 @@ def init(name: str):
 
 # package("/home/faridsei/dev/code/knowledge-base/metadata.json", nested=True)
 # information_page(
-#     "/home/faridsei/dev/code/knowledge-base-mpog/metadata.json",
-#     "/home/faridsei/dev/code/knowledge-base-mpog/index.html",
+#     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
+#     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/index.html",
+#     False,
 # )
 # init("test")
 
