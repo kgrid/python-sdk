@@ -17,7 +17,9 @@
   },
   "dc:publisher": "KO_Pubmisher",
   "dc:type": "software",
-  "dc:license": "KO_LicenseFile",  
+  "dc:license": {
+    "@id":"KO_LicenseFile"
+  },  
   "koio:hasService": [
     {
       "@type": [

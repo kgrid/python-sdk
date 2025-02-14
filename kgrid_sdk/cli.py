@@ -40,9 +40,10 @@ def package(
     """
     packages the content of the given path using metadata.
 
-    param metadata-path(str): The location of the metadata file. Defaults to metadata.json in the current directory.
-    param output(str): Location and name to create the package. If it is not provided the name of the parent directory where the metadata file is located and the version name will be used as the name of the output file and the output package will be saved in the current directory.
-    param nested(bool): Use this option to have all the files and folders copied in a folder in the created package with the name of the parent directory and the version. By default all the file and folders will be added to the root of the package file.
+    Args:
+        metadata-path (str): The location of the metadata file. Defaults to metadata.json in the current directory.
+        output (str): Location and name to create the package. If it is not provided the name of the parent directory where the metadata file is located and the version name will be used as the name of the output file and the output package will be saved in directory of the metadata file.
+        nested (bool): Use this option to have all the files and folders copied in a folder in the created package with the name of the parent directory and the version. By default all the file and folders will be added to the root of the package file.
     """
 
     # Resolve the directory of the metadata file
@@ -58,12 +59,14 @@ def package(
         full_path = metadata_dir / Path(relative_path)
         elements_to_package.append(full_path)
 
-    if metadata["dc:license"]:
-        elements_to_package.append(metadata_dir / metadata["dc:license"])
+    if metadata.get("dc:license", {}).get("@id"):
+        elements_to_package.append(metadata_dir / metadata["dc:license"]["@id"])
     cleaned_elements_to_package = filter_files(elements_to_package)
 
     if not output:
-        output = metadata_dir.name + "-" + metadata["dc:version"] + ".tar.gz"
+        output = metadata_dir / (
+            metadata_dir.name + "-" + metadata["dc:version"] + ".tar.gz"
+        )
 
     # Create the .tar.gz archive
     with tarfile.open(
@@ -75,7 +78,7 @@ def package(
                 tar.add(
                     path,
                     arcname=Path(
-                        Path(metadata_path).parent.name + "-" + metadata["dc:version"],
+                        Path(metadata_path).parent.name.replace("-","_") + "_" + metadata["dc:version"].replace("-","_"),
                         path.relative_to(metadata_dir),
                     )
                     if nested
@@ -142,14 +145,15 @@ def get_filename(url):
 def information_page(
     metadata_path: str = "metadata.json",
     output: str = "index.html",
-    includ_relative_paths: bool = False,
+    include_relative_paths: bool = False,
 ):
     """
     creates knowledge object information page using metadata
 
-    param metadata_path(str): Specifies the path to the metadata file. If not provided, the command will look for a file named `metadata.json` in the current directory.
-    param output(str): Specifies the output path and file name for the generated information page. If not provided, the page will be saved as `index.html` in the current directory.
-    param includ_relative_paths(bool): Indicates whether to include links to local files or to the remote GitHub repository, based on the path where the metadata is located.
+    Args:
+        metadata_path (str): Specifies the path to the metadata file. If not provided, the command will look for a file named `metadata.json` in the current directory.
+        output (str): Specifies the output path and file name for the generated information page. If not provided, the page will be saved as `index.html` in the current directory.
+        include_relative_paths (bool): Indicates whether to include links to local files or to the remote GitHub repository, based on the path where the metadata is located.
     """
 
     # Load metadata JSON
@@ -174,9 +178,10 @@ def information_page(
     # Get the branch URL for links
     base_iri = get_github_branch_url(metadata_path)
 
-    if base_iri and not includ_relative_paths:
+    if base_iri and not include_relative_paths:
         metadata = expand_ids(metadata, {"base": base_iri, "expandContext": context})
-
+    else:
+        base_iri = "./"
     env = Environment()
     env.filters["filename"] = get_filename
     # Jinja2 template
@@ -274,7 +279,9 @@ def information_page(
             <div class="metadata" id="metadata">
             <h1>{{ metadata.get("dc:title", "Untitled") }}</h1>
             <p>{{ metadata.get("dc:description", "").replace("\n", "<br>") }}</p>
-            <p><strong>Id:</strong> {{ metadata.get("@id", "Undefined").replace("_:","") }}</p>
+            <p><strong>Id:</strong> <a href="{{base_iri}}" target='_blank'> 
+                {{ metadata.get("@id", "Undefined").replace("_:","") }}
+            </a></p>
             <p><strong>Identifier:</strong> {{ metadata.get("dc:identifier", "Undefined") }}</p>
             <p><strong>Type:</strong> <a href="{{ expanded_metadata[0].get('@type', [''])[0] }}" target='_blank'>{{ metadata.get('@type', 'Undefined') }}</a></p>
             <p><strong>Version:</strong> {{ metadata.get("dc:version", "Undefined") }}</p>
@@ -346,12 +353,15 @@ def information_page(
                 {% for implementation in implemented_by %}
                     <li>
                     <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank'>
-                        {{ implementation.get("@id", "Undefined") | filename}}
+                        {{ implementation.get("dc:title") if implementation.get("dc:title") else implementation.get("@id", "Undefined") | filename}}
                     </a>(type: {{ implementation.get("@type", "Undefined") }})
                     </li>
                 {% endfor %}
                 </ul>
                 </p>
+                {% if knowledge.get("dependsOn") %}
+                    <p><strong>Depends on:</strong> {{ knowledge.get("dependsOn", "Undefined") }}</p>
+                {% endif %}
                 {% if knowledge.get("dc:source") %}
                 <p><strong>Source:</strong> 
                     <a href="{{ knowledge.get("dc:source", "Undefined") }}" target='_blank'>
@@ -440,6 +450,7 @@ def information_page(
         expanded_metadata=expanded_metadata,
         documentation=documentation,
         tests=tests,
+        base_iri=os.path.dirname(base_iri),
     )
     with open(output, "w") as f:
         f.write(html)
@@ -522,7 +533,8 @@ def init(name: str):
     """
     Adds metadata, readme, license and KO information page to a ko folder.
 
-    :param name: Knowledge Object name.
+    Args:
+        name (str): Knowledge Object name.
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     template_path = os.path.join(script_dir, "templates", "metadata.json")
@@ -574,9 +586,30 @@ def init(name: str):
 
 
 # package("/home/faridsei/dev/code/knowledge-base/metadata.json", nested=True)
+# package(
+#     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
+#     nested=True,
+# )
+# package("/home/faridsei/dev/code/knowledge-base-mpog/metadata.json", nested=True)
+
 # information_page(
 #     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
 #     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/index.html",
+#     False,
+# )
+# information_page(
+#     "/home/faridsei/dev/code/knowledge-base-mpog/metadata.json",
+#     "/home/faridsei/dev/code/knowledge-base-mpog/index.html",
+#     False,
+# )
+# information_page(
+#     "/home/faridsei/dev/code/knowledge-base/metadata.json",
+#     "/home/faridsei/dev/code/knowledge-base/index.html",
+#     False,
+# )
+# information_page(
+#     "/home/faridsei/dev/code/koio/examples/tobacco_v_2/metadata.json",
+#     "/home/faridsei/dev/code/koio/examples/tobacco_v_2/index.html",
 #     False,
 # )
 # init("test")
