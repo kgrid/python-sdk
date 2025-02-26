@@ -78,7 +78,9 @@ def package(
                 tar.add(
                     path,
                     arcname=Path(
-                        Path(metadata_path).parent.name.replace("-","_") + "_" + metadata["dc:version"].replace("-","_"),
+                        Path(metadata_path).parent.resolve().name.replace("-", "_")
+                        + "_"
+                        + metadata["dc:version"].replace("-", "_"),
                         path.relative_to(metadata_dir),
                     )
                     if nested
@@ -280,7 +282,7 @@ def information_page(
             <h1>{{ metadata.get("dc:title", "Untitled") }}</h1>
             <p>{{ metadata.get("dc:description", "").replace("\n", "<br>") }}</p>
             <p><strong>Id:</strong> <a href="{{base_iri}}" target='_blank'> 
-                {{ metadata.get("@id", "Undefined").replace("_:","") }}
+                {{ metadata.get("@id", "Undefined").split('/')[-1] }}
             </a></p>
             <p><strong>Identifier:</strong> {{ metadata.get("dc:identifier", "Undefined") }}</p>
             <p><strong>Type:</strong> <a href="{{ expanded_metadata[0].get('@type', [''])[0] }}" target='_blank'>{{ metadata.get('@type', 'Undefined') }}</a></p>
@@ -319,7 +321,7 @@ def information_page(
             <hr>
             <h2>Services</h2>
             {% for service in metadata.get("koio:hasService", []) %}
-                <p><h3> {{ service.get("@id", "").replace("_:","") }}</h3></p>
+                <p><h3> {{ service.get("@id", "").split('/')[-1] }}</h3></p>
                 <p><strong>Type:</strong> {{ service.get("@type", ["Undefined"])[0] }}</p>
                 <p><strong>Depends on:</strong> {{ service.get("dependsOn", "Undefined") }}</p>
                 <p><strong>Implemented by:</strong> 
@@ -341,7 +343,7 @@ def information_page(
             <hr>
             <h2>Knowledge</h2>
             {% for knowledge in metadata.get("koio:hasKnowledge", []) %}
-                <p><h3> {{ knowledge.get("@id", "").replace("_:","") }}</h3></p>
+                <p><h3> {{ knowledge.get("@id", "").split('/')[-1] }}</h3></p>
                 <p><strong>Type:</strong> {{ knowledge.get("@type", ["Undefined"]) }}</p>
                 {% if knowledge.get("dc:description") %}
                     <p><strong>Description:</strong> {{ knowledge.get("dc:description", "") }}</p>
@@ -425,7 +427,7 @@ def information_page(
             {% if tests %}
                 <h2>Tests</h2>
                 {% for test in tests %}
-                    <h3><a href="{{ test.get('@id', '#') }}" target='_blank'>{{ test.get('dc:title', 'Untitled') }}</a></h3>
+                    <h3><a href="{{ test.get('implementedBy', {}).get('@id', '#') }}" target='_blank'>{{ test.get('dc:title', 'Untitled') }}</a></h3>
                     <p>{{ test.get('dc:description', 'No description') }}</p>
                 {% endfor %}
             {% else %}
@@ -587,10 +589,10 @@ def init(name: str):
 
 # package("/home/faridsei/dev/code/knowledge-base/metadata.json", nested=True)
 # package(
-#     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
+#     "metadata.json",
 #     nested=True,
 # )
-# package("/home/faridsei/dev/code/knowledge-base-mpog/metadata.json", nested=True)
+# package("/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json", nested=True)
 
 # information_page(
 #     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
