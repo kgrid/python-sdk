@@ -197,7 +197,7 @@ def information_page(
     base_iri = get_github_branch_url(metadata_path)
 
     if base_iri and not include_relative_paths:
-        if isinstance(context["@context"], str):
+        if not isinstance(context["@context"], list):
             metadata = expand_ids(metadata, {"base": base_iri, "expandContext": context})
         if isinstance(context["@context"], list):
             for ctx in context["@context"]:
@@ -614,16 +614,16 @@ def init(name: str):
 # )
 # package("/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json", nested=True)
 
-# information_page(
-#     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
-#     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/index.html",
-#     False,
-# )
 information_page(
-    "/home/faridsei/dev/code/knowledge-base-mpog/metadata.json",
-    "/home/faridsei/dev/code/knowledge-base-mpog/index.html",
+    "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
+    "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/index.html",
     False,
 )
+# information_page(
+#     "/home/faridsei/dev/code/knowledge-base-mpog/metadata.json",
+#     "/home/faridsei/dev/code/knowledge-base-mpog/index.html",
+#     False,
+# )
 # information_page(
 #     "/home/faridsei/dev/code/knowledge-base/metadata.json",
 #     "/home/faridsei/dev/code/knowledge-base/index.html",
