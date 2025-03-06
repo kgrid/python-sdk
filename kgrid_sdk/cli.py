@@ -614,11 +614,11 @@ def init(name: str):
 # )
 # package("/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json", nested=True)
 
-information_page(
-    "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
-    "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/index.html",
-    False,
-)
+# information_page(
+#     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
+#     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/index.html",
+#     False,
+# )
 # information_page(
 #     "/home/faridsei/dev/code/knowledge-base-mpog/metadata.json",
 #     "/home/faridsei/dev/code/knowledge-base-mpog/index.html",
