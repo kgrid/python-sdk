@@ -1,5 +1,5 @@
 {
-  "@context": "https://kgrid.org/koio/2.0/context",
+  "@context": "https://kgrid.org/koio/2.1/context",
   "@id": "KO_Id",
   "koio:kgrid": "2",
   "@type": "koio:KnowledgeObject",
@@ -10,7 +10,7 @@
   "dc:description": "KO_Description",
   "schema:creator": {
     "@id": "KO_CreatorWebSite",
-    "@type": "team",
+    "@type": "schema:Organization",
     "schema:name": "KO_CreatorName",
     "schema:affiliation": "KO_CreatorAffiliation",
     "schema:email": "KO_CreatorEmail"
@@ -23,6 +23,7 @@
   "koio:hasService": [
     {
       "@type": [
+        "Service",
         "KO_ServiceType"
       ],
       "dependsOn": "KO_KnowlegeId",
@@ -46,21 +47,25 @@
       "dc:format": "text/html",
       "dc:date": "KO_KnowledgeCreationDate",
       "schema:creator": {
-        "@type": "Organization",
+        "@type": "schema:Organization",
         "schema:name": "KO_KnwoledgeCreatorName"
       },
       "koio:hasTest": [
         {
-          "@id": "KO_KnowledgeTestPath",
-          "dc:title": "KO_KnowledgeTestTitle",
+          "@id": "KO_KnowledgeTestId",          
           "@type": "koio:Test",
-          "dc:description": "KO_KnowledgeTestDescription"
+          "dc:title": "KO_KnowledgeTestTitle",
+          "dc:description": "KO_KnowledgeTestDescription",
+          "implementedBy": {
+            "@id": "KO_KnowledgeTestImplementationPath",
+            "@type": "Python"
+          }
         }
       ],
       "koio:hasDocumentation": [
         {
           "@id": "KO_KnowledgeDocumentationPath",
-          "@type": "koio:Documentation",
+          "@type": "InformationArtifact",
           "dc:title": "KO_KnowledgeDocumentationTitle",
           "dc:description": "KO_KnowledgeDocumentationDescription"
         }
@@ -70,7 +75,7 @@
   "koio:hasDocumentation": [
     {
       "@id": "KO_DocumentationPath",
-      "@type": "koio:Documentation",
+      "@type": "InformationArtifact",
       "dc:title": "KO_DocumentationTitle",
       "dc:description": "KO_DocumentationDescription"
     }

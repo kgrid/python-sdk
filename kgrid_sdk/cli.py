@@ -176,12 +176,32 @@ def information_page(
 
         # Replace the external URL in your original context with the external one
         context["@context"] = external_context
+        
+    # Check if context["@context"] is an array then go through each item
+    if isinstance(context["@context"], list):
+        new_context = []
+        for item in context["@context"]:
+            # Check if item is a URL then load it otherwise add it as is
+            if isinstance(item, str):
+                # Fetch the external context
+                external_context_url = item
+                response = requests.get(external_context_url)
+                external_context = response.json()
 
+                # add the external context 
+                new_context.append({"@context":external_context })
+            else:
+                new_context.append({"@context":item })
+        context["@context"] = new_context 
     # Get the branch URL for links
     base_iri = get_github_branch_url(metadata_path)
 
     if base_iri and not include_relative_paths:
-        metadata = expand_ids(metadata, {"base": base_iri, "expandContext": context})
+        if isinstance(context["@context"], str):
+            metadata = expand_ids(metadata, {"base": base_iri, "expandContext": context})
+        if isinstance(context["@context"], list):
+            for ctx in context["@context"]:
+                metadata = expand_ids(metadata, {"base": base_iri, "expandContext": ctx})
     else:
         base_iri = "./"
     env = Environment()
@@ -550,14 +570,14 @@ def init(name: str):
     metadata["dc:date"] = datetime.now().strftime("%Y-%m-%d")
     metadata["dc:version"] = "v1.0"
     metadata["dc:identifier"] = "ark:" + metadata["@id"]
-    metadata["dc:license"] = "license.md"
+    metadata["dc:license"]["@id"] = "license.md"
     metadata["koio:hasDocumentation"][0]["@id"] = "README.md"
     metadata["koio:hasDocumentation"][0]["dc:title"] = "README.md"
     metadata["koio:hasDocumentation"][0]["dc:description"] = "KO readme file."
     metadata["koio:hasDocumentation"].append(
         {
             "@id": "index.html",
-            "@type": "koio:Documentation",
+            "@type": "InformationArtifact",
             "dc:title": "Knowledge Object Information Page",
             "dc:description": "Knowledge object information page.",
         }
@@ -599,11 +619,11 @@ def init(name: str):
 #     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/index.html",
 #     False,
 # )
-# information_page(
-#     "/home/faridsei/dev/code/knowledge-base-mpog/metadata.json",
-#     "/home/faridsei/dev/code/knowledge-base-mpog/index.html",
-#     False,
-# )
+information_page(
+    "/home/faridsei/dev/code/knowledge-base-mpog/metadata.json",
+    "/home/faridsei/dev/code/knowledge-base-mpog/index.html",
+    False,
+)
 # information_page(
 #     "/home/faridsei/dev/code/knowledge-base/metadata.json",
 #     "/home/faridsei/dev/code/knowledge-base/index.html",
