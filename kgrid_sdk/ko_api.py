@@ -16,7 +16,7 @@ class Ko_API(Ko_Execution):
             title=self.metadata.get("dc:title", "Unknown title"),
             description=self.metadata.get("dc:description", "Unknown description"),
             version=self.get_version(),
-            contact={"name": self.metadata.get("koio:contributors", "Unknown contact")},
+            contact={"name": self.metadata.get("contributors", "Unknown contact")},
         )
         self._setup_routes()       
     

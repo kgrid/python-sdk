@@ -139,7 +139,7 @@
                 <p><strong>Type:</strong> <a href='${expanded[0]["@type"]}'> ${metadata["@type"] }</a></p>
                 <p><strong>Version:</strong>  ${metadata["dc:version"] }</p>
                 <p><strong>Date:</strong>  ${metadata["dc:date"] }</p>
-                <p><strong>KGrid model version:</strong> ${metadata["koio:kgrid"]}</p>
+            <p><strong>KGrid model version:</strong> ${metadata["KOIOVersion"]}</p>
                 <br/>
 
                 <h2>Creator Information</h2>
@@ -171,7 +171,7 @@
             `;
 
             // Iterate over the services and add a section for each
-            const services = metadata["koio:hasService"];
+            const services = metadata["hasService"];
             if (Array.isArray(services)) {
                 metadataDiv.innerHTML += '<h2> Services </h2>';
                 for (const service of services)  {   
@@ -199,7 +199,7 @@
             }
 
             metadataDiv.innerHTML += "<h2 id='Knowledge'> Knowledge </h2>";
-            const knowledges = metadata["koio:hasKnowledge"];
+            const knowledges = metadata["hasKnowledge"];
             if (Array.isArray(knowledges)) {
                 for (const knowledge of knowledges)  {  
                     const implementedByExpanded = await jsonld.expand(knowledge["implementedBy"], { base: baseIRI });
@@ -226,7 +226,7 @@
                 console.warn('The variable "services" is not an array or is undefined.');
             }
 
-            const documentations = findItem(metadata, 'koio:hasDocumentation');
+            const documentations = findItem(metadata, 'hasDocumentation');
             if (documentations && documentations.length > 0) {
                 let docHTML = `<h2>Documentation</h2>`;
                 for (const doc of documentations)  {  
@@ -241,7 +241,7 @@
                 docSection.innerHTML = `<p>No documentation available</p>`;
             }
 
-            const tests = findItem(metadata, 'koio:hasTest');
+            const tests = findItem(metadata, 'hasTest');
             if (tests.length > 0) {
                 let testHTML = `<h2>Tests</h2>`;
                 for (const test of tests)  {  
