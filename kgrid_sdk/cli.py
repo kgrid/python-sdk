@@ -619,11 +619,11 @@ def init(name: str):
 # )
 # package("/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json", nested=True)
 
-information_page(
-    "/home/faridsei/dev/code/USPSTF-collection/cardiovascular-prevention-statin-use/metadata.json",
-    "/home/faridsei/dev/code/USPSTF-collection/cardiovascular-prevention-statin-use/index.html",
-    True,
-)
+# information_page(
+#     "/home/faridsei/dev/code/USPSTF-collection/cardiovascular-prevention-statin-use/metadata.json",
+#     "/home/faridsei/dev/code/USPSTF-collection/cardiovascular-prevention-statin-use/index.html",
+#     True,
+# )
 # information_page(
 #     "/home/faridsei/dev/code/knowledge-base-mpog/metadata.json",
 #     "/home/faridsei/dev/code/knowledge-base-mpog/index.html",
