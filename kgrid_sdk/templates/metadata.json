@@ -1,8 +1,8 @@
 {
   "@context": "https://kgrid.org/koio/2.1/context",
   "@id": "KO_Id",
-  "koio:kgrid": "2",
-  "@type": "koio:KnowledgeObject",
+  "KOIOVersion": "2.1",
+  "@type": "KnowledgeObject",
   "dc:title": "KO_Title",
   "dc:identifier": "ark:KO_Identifier",
   "dc:version": "KO_Version",
@@ -18,9 +18,9 @@
   "dc:publisher": "KO_Pubmisher",
   "dc:type": "software",
   "dc:license": {
-    "@id":"KO_LicenseFile"
-  },  
-  "koio:hasService": [
+    "@id": "KO_LicenseFile"
+  },
+  "hasService": [
     {
       "@type": [
         "Service",
@@ -30,30 +30,34 @@
       "implementedBy": {
         "@id": "KO_ServicePath",
         "@type": [
+          "Implementation",
           "KO_ServiceImplementationType"
         ]
       }
     }
   ],
-  "koio:hasKnowledge": [
+  "hasKnowledge": [
     {
       "@id": "KO_KnowledgeId",
-      "@type": "koio:Knowledge",
+      "@type": "Knowledge",
       "implementedBy": {
         "@id": "KO_KnowledgeImplementationPath",
-        "@type": "Function"
+        "@type": [
+          "Implementation",
+          "Function"
+        ]
       },
-      "dc:source":"KO_KnowLedgeSource",
+      "dc:source": "KO_KnowLedgeSource",
       "dc:format": "text/html",
       "dc:date": "KO_KnowledgeCreationDate",
       "schema:creator": {
         "@type": "schema:Organization",
         "schema:name": "KO_KnwoledgeCreatorName"
       },
-      "koio:hasTest": [
+      "hasTest": [
         {
-          "@id": "KO_KnowledgeTestId",          
-          "@type": "koio:Test",
+          "@id": "KO_KnowledgeTestId",
+          "@type": "Test",
           "dc:title": "KO_KnowledgeTestTitle",
           "dc:description": "KO_KnowledgeTestDescription",
           "implementedBy": {
@@ -62,7 +66,7 @@
           }
         }
       ],
-      "koio:hasDocumentation": [
+      "hasDocumentation": [
         {
           "@id": "KO_KnowledgeDocumentationPath",
           "@type": "InformationArtifact",
@@ -72,7 +76,7 @@
       ]
     }
   ],
-  "koio:hasDocumentation": [
+  "hasDocumentation": [
     {
       "@id": "KO_DocumentationPath",
       "@type": "InformationArtifact",
