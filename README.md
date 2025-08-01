@@ -259,8 +259,8 @@ This command creates the following files in the current directory: `metadata.jso
 - The information page reflects the metadata.
 The `README.md` and `license.md` files are generated as empty files.
 
-### Knowledge Object Information Page
-To generate an information page for a Knowledge Object using its metadata, use the following command:
+### Knowledge Object / Knowledgebase Information Page
+To generate an information page for a Knowledge Object or a Knowledgebase using its metadata, use the following command:
 ```bash
 kgrid information-page --metadata-path /path/to/metadata.json --output /path/to/index.html
 ```
