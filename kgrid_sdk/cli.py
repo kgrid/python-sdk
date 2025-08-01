@@ -338,10 +338,10 @@ def information_page(
                 </a>
             </p>
 
-            {% if metadata.get("https://kgrid.org/koio#hasKnowledge") %}
+            {% if knowledge_items!=[] %}
                 <hr>
                 <h2>Knowledge</h2>
-                {% for knowledge in metadata.get("https://kgrid.org/koio#hasKnowledge", []) %}
+                {% for knowledge in knowledge_items %}
                     {% set hasKnowledgeObject = knowledge.get("https://kgrid.org/koio#hasKnowledgeObject", [{}]) %}
                     {% set knowledgeType = knowledge.get("@type", ["Undefined"])[0]%}
                     {% if knowledgeType ==  "https://kgrid.org/koio#KnowledgeSet" and hasKnowledgeObject ==  [{}]%}  
@@ -450,10 +450,10 @@ def information_page(
                 {% endfor %}
             {% endif %}
 
-            {% if metadata.get("https://kgrid.org/koio#hasService") %}
+            {% if services != [] %}
             <hr>
             <h2>Services</h2>
-            {% for service in metadata.get("https://kgrid.org/koio#hasService", []) %}
+            {% for service in services %}
                 <p><h3> {{ service.get("@id", "").split('/')[-1] }}</h3></p>
                 <p><strong>Type:</strong> 
                         <a href="{{ service.get("@type", ["Undefined"])[0] }}" target='_blank'>
@@ -492,6 +492,9 @@ def information_page(
                 {% for doc in documentation %}
                     <h3><a href="{{ doc.get('@id', '#') }}" target='_blank'>{{ doc.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a></h3>
                     <p>{{ doc.get('http://purl.org/dc/elements/1.1/description', [{"@value":"No description"}])[0]["@value"] }}</p>
+                    {% if doc.get("item_of","")!="" %}
+                        <p><strong>Document of</strong> {{doc.get("item_of","")[0]["@value"]}} ({{ doc.get("type","") }}) </p>
+                    {% endif %}
                 {% endfor %}
             {% else %}
                 <p>No documentation available</p>
@@ -504,6 +507,9 @@ def information_page(
                 {% for test in tests %}
                     <h3><a href="{{ test.get('http://www.ebi.ac.uk/swo/SWO_0000085', [{}])[0].get('@id', '#') }}" target='_blank'>{{ test.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a></h3>
                     <p>{{ test.get('http://purl.org/dc/elements/1.1/description', [{"@value":"No description"}])[0]["@value"] }}</p>
+                    {% if test.get("item_of","")!="" %}
+                        <p><strong>Test of</strong> {{test.get("item_of","")[0]["@value"]}} ({{ test.get("type","") }}) </p>
+                    {% endif %}
                 {% endfor %}
             {% else %}
                 <p>No tests available</p>
@@ -515,18 +521,19 @@ def information_page(
     </html>
     """)
 
-    results = []
-    # Find documentation and tests
-    documentation = find_item(metadata, "https://kgrid.org/koio#hasDocumentation", results)
-    results = []
-    tests = find_item(metadata, "https://kgrid.org/koio#hasTest", results)
-
+    
+    documentation = find_item(metadata, "https://kgrid.org/koio#hasDocumentation", [],metadata.get("http://purl.org/dc/elements/1.1/title", ""), metadata.get("@type", [])[0].split('/')[-1])
+    tests = find_item(metadata, "https://kgrid.org/koio#hasTest", [],metadata.get("http://purl.org/dc/elements/1.1/title", ""), metadata.get("@type", {"@value":[]})[0].split('/')[-1])
+    knowledge_items = metadata.get("https://kgrid.org/koio#hasKnowledge", [])
+    services = metadata.get("https://kgrid.org/koio#hasService", [])
     # Render the template
     html = template.render(
         metadata=metadata,
         expanded_metadata=expanded_metadata,
         documentation=documentation,
         tests=tests,
+        knowledge_items=knowledge_items,
+        services=services,
         base_iri=os.path.dirname(base_iri),
     )
     with open(output, "w") as f:
@@ -539,7 +546,7 @@ def expand_metadata(data, base_context):
     return jsonld.expand(data, base_context)[0]  # Return as-is if not a dict or list
 
 
-def find_item(obj, key, results: list):
+def find_item(obj, key, results: list, title, obj_type):
     """Recursively find all items with the given key in a nested dictionary."""
 
     if isinstance(obj, dict):
@@ -547,16 +554,33 @@ def find_item(obj, key, results: list):
             if k == key:
                 if isinstance(v, (list)):
                     for item in v:
+                        item["item_of"] = title
+                        item["type"] = obj_type
                         results.append(item)
                 else:
+                    v["item_of"] = title
+                    v["type"] = obj_type
                     results.append(v)
             elif isinstance(v, (dict, list)):
-                results = find_item(v, key, results)
+                obj_type = get_object_types(obj)
+                results = find_item(v, key, results, obj.get("http://purl.org/dc/elements/1.1/title", [{"@value": obj.get("@id", "").split('/')[-1]}]), obj_type)
     elif isinstance(obj, list):
         for item in obj:
-            results = find_item(item, key, results)
+            if not isinstance(item, str):
+                obj_type = get_object_types(item)
+                results = find_item(item, key, results, item.get("http://purl.org/dc/elements/1.1/title", [{"@value": item.get("@id", "").split('/')[-1]}]),  obj_type)
     return results
 
+def get_object_types(obj):
+    obj_type = ""
+    if isinstance( obj.get("@type"), list):
+        types = obj.get("@type", [])
+        for i,item in enumerate(types):
+            is_last = (i == len(types) - 1)
+            obj_type += item.split('/')[-1] + ("" if is_last else ",")
+    else:
+        obj_type = obj.get("@type", "").split('/')[-1]
+    return obj_type
 
 def get_github_branch_url(file_path):
     try:
@@ -649,30 +673,15 @@ def init(name: str):
 
 
 # package("/home/faridsei/dev/code/knowledge-base/metadata.json", nested=True)
-# package(
-#     "metadata.json",
-#     nested=True,
-# )
 # package("/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json", nested=True)
-
-information_page(
-    "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
-    "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/index.html",
-    False,
-)
+# information_page(
+#     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
+#     "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/index.html",
+#     False,
+# )
 # information_page(
 #     "/home/faridsei/dev/code/pgx-knowledge-base/pgx-kb/metadata.json",
 #     "/home/faridsei/dev/code/pgx-knowledge-base/pgx-kb/index.html",
-#     False,
-# )
-# information_page(
-#     "/home/faridsei/dev/code/knowledge-base/metadata.json",
-#     "/home/faridsei/dev/code/knowledge-base/index.html",
-#     False,
-# )
-# information_page(
-#     "/home/faridsei/dev/code/koio/examples/tobacco_v_2/metadata.json",
-#     "/home/faridsei/dev/code/koio/examples/tobacco_v_2/index.html",
 #     False,
 # )
 # init("test")

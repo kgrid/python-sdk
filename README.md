@@ -1,35 +1,20 @@
-# kgrid_sdk
+# KGrid SDK
+Use KGrid SDK library for 
+- Creating a python Knowledge object
+- Creating a collection
 
-## Implementation
-### Dependency management
-To manage dependencies and make it possible to only install dependencies required for what you want to use from SDK we decided to use Python's Optional Dependencies rather than creating separate packages for each class.
-
-Packaging each class separately has its advantages, especially if each class represents a distinct, independent feature with unique dependencies which is not the case in our usecase. However, using optional dependencies within a single package can offer significant benefits in terms of usability and maintainability. Here’s a comparison to help decide which approach might work best for you
-
-1. Installation Simplicity
-With optional dependencies, users install a single package (kgrid_sdk) and add only the extra features they need using extras (e.g., kgrid_sdk[cli]). This is generally simpler and more user-friendly, as all features are accessible through a single, central package
-
-2. Namespace and Code Organization
-Keeping everything in a single package means all classes share the same namespace and project structure, making the API simpler and more cohesive for users. They import from kgrid_sdk package regardless of the feature set they need, which simplifies code and documentation.
-
-3. Code Reusability and Dependency Management
-A single package with optional dependencies is easier to manage if some classes share common dependencies. You only define common dependencies once, and updates propagate across all features. It also avoids versioning conflicts between interdependent features.
-
-4. User Flexibility and Lightweight Installation
-Users can install only what they need, making the package lightweight without requiring multiple packages. It provides flexibility without adding complexity since extras are not installed by default.
-
-5. Version Management and Compatibility
-You manage versioning in one central package. Compatibility between the core and extras is generally simpler to control, as everything is versioned and released together.
-
-The current version of the SDK only has optional dependencies for Ko_API class. If this class is used, these optional dependencies could be installed with the package using `-E api` if you are using `poetry install` or `poetry add` and using `[api]` if you are using `pip install`.
+Use KGrid SDK CLI for
+- Initiating a KGrid Knowledge Object
+- Creating an Information Page for a Knowledge Object or Knowledgebase
+- Metadata-Driven Packaging of a Knowledge Object
 
 ## Create a python Knowledge Object
 You can use this package to implement python Knowledge Objects.
 
-### add  kgrid_sdk package as a dependency in your Knowledge Object
+### Add  kgrid_sdk package as a dependency in your Knowledge Object
 The `kgrid_sdk` package is available on PyPI and can be easily added as a dependency to your project. Here’s how to include it in your project based on your setup:
 
-#### using Poetry
+#### Using Poetry
 - For the base package:
 ```bash
 poetry add kgrid_sdk
@@ -259,7 +244,7 @@ This command creates the following files in the current directory: `metadata.jso
 - The information page reflects the metadata.
 The `README.md` and `license.md` files are generated as empty files.
 
-### Knowledge Object / Knowledgebase Information Page
+### Create an Information Page for a Knowledge Object or Knowledgebase
 To generate an information page for a Knowledge Object or a Knowledgebase using its metadata, use the following command:
 ```bash
 kgrid information-page --metadata-path /path/to/metadata.json --output /path/to/index.html
@@ -292,6 +277,29 @@ This command processes the specified metadata file and gathers all referenced co
 ```bash
 kgrid package --metadata-path /path/to/metadata.json --nested
 ```
+
+## Implementation
+### Dependency management
+To manage dependencies and make it possible to only install dependencies required for what you want to use from SDK we decided to use Python's Optional Dependencies rather than creating separate packages for each class.
+
+Packaging each class separately has its advantages, especially if each class represents a distinct, independent feature with unique dependencies which is not the case in our usecase. However, using optional dependencies within a single package can offer significant benefits in terms of usability and maintainability. Here’s a comparison to help decide which approach might work best for you
+
+1. Installation Simplicity
+With optional dependencies, users install a single package (kgrid_sdk) and add only the extra features they need using extras (e.g., kgrid_sdk[cli]). This is generally simpler and more user-friendly, as all features are accessible through a single, central package
+
+2. Namespace and Code Organization
+Keeping everything in a single package means all classes share the same namespace and project structure, making the API simpler and more cohesive for users. They import from kgrid_sdk package regardless of the feature set they need, which simplifies code and documentation.
+
+3. Code Reusability and Dependency Management
+A single package with optional dependencies is easier to manage if some classes share common dependencies. You only define common dependencies once, and updates propagate across all features. It also avoids versioning conflicts between interdependent features.
+
+4. User Flexibility and Lightweight Installation
+Users can install only what they need, making the package lightweight without requiring multiple packages. It provides flexibility without adding complexity since extras are not installed by default.
+
+5. Version Management and Compatibility
+You manage versioning in one central package. Compatibility between the core and extras is generally simpler to control, as everything is versioned and released together.
+
+The current version of the SDK only has optional dependencies for Ko_API class. If this class is used, these optional dependencies could be installed with the package using `-E api` if you are using `poetry install` or `poetry add` and using `[api]` if you are using `pip install`.
 
 
 
