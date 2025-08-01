@@ -342,7 +342,16 @@ def information_page(
                 <hr>
                 <h2>Knowledge</h2>
                 {% for knowledge in metadata.get("https://kgrid.org/koio#hasKnowledge", []) %}
-                    <p><h3> {{ knowledge.get("@id", "").split('/')[-1] }}</h3></p>
+                    {% set hasKnowledgeObject = knowledge.get("https://kgrid.org/koio#hasKnowledgeObject", [{}]) %}
+                    {% set knowledgeType = knowledge.get("@type", ["Undefined"])[0]%}
+                    {% if knowledgeType ==  "https://kgrid.org/koio#KnowledgeSet" and hasKnowledgeObject ==  [{}]%}  
+                        <p><a href='{{ knowledge.get("@id", "") }}' target='_blank'>
+                            <h3> {{ knowledge.get("http://purl.org/dc/elements/1.1/title", [{"@value": knowledge.get("@id", "").split('/')[-1]}])[0]["@value"] }}</h3>
+                        </a>
+                    {% else%}</p>
+                        <p><h3> {{ knowledge.get("http://purl.org/dc/elements/1.1/title", [{"@value": knowledge.get("@id", "").split('/')[-1]}])[0]["@value"] }}</h3></p>
+                    {% endif %}     
+                    
                     <p><strong>Type:</strong> 
                             <a href="{{ knowledge.get("@type", ["Undefined"])[0] }}" target='_blank'>
                                 {{ knowledge.get("@type", ["Undefined"])[0] }}
@@ -352,29 +361,47 @@ def information_page(
                         <p><strong>Description:</strong> {{ knowledge.get("http://purl.org/dc/elements/1.1/description", [{"@value":""}])[0]["@value"] }}</p>
                     {% endif %}
                     {% set implemented_by = knowledge.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}]) %}
-                    {% set implemented_by = [implemented_by] if implemented_by is mapping else implemented_by %}
-                    <p><strong>Implemented by:</strong> 
-                    <ul>
-                    {% for implementation in implemented_by %}
-                        <li>
-                        <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank'>
-                            {{ implementation.get("http://purl.org/dc/elements/1.1/title") if implementation.get("http://purl.org/dc/elements/1.1/title") else implementation.get("@id", [{"@value":"Undefined"}])[0]["@value"] | filename}}
-                        </a><br/>(type: 
-                            {% set imp_types = implementation.get("@type", "Undefined")%}
-                            <ul>
-                            {% for imp_type in imp_types %}  
-                                <li>
-                                    <a href="{{ imp_type }}" target='_blank'>
-                                        {{ imp_type }}
-                                    </a>
-                                </li>    
-                            {% endfor %}
-                            </ul>
-                            )
-                        </li>
-                    {% endfor %}
-                    </ul>
-                    </p>
+                    
+                    {% if implemented_by != [{}]%}
+                        {% set implemented_by = [implemented_by] if implemented_by is mapping else implemented_by %}
+                        <p><strong>Implemented by:</strong> 
+                        <ul>
+                        {% for implementation in implemented_by %}
+                            <li>
+                            <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank'>
+                                {{ implementation.get("http://purl.org/dc/elements/1.1/title") if implementation.get("http://purl.org/dc/elements/1.1/title") else implementation.get("@id", "Undefined") | filename}}
+                            </a><br/>(type: 
+                                {% set imp_types = implementation.get("@type", "Undefined")%}
+                                
+                                {% for imp_type in imp_types %}  
+                                    
+                                        <a href="{{ imp_type }}" target='_blank'>
+                                            {{ imp_type }}
+                                        </a>{% if not loop.last %}, {% endif %}
+                                      
+                                {% endfor %}
+                                
+                                )
+                            </li>
+                        {% endfor %}
+                        </ul>
+                        </p>
+                    {% endif %}                 
+        
+                    {% if hasKnowledgeObject != [{}]%}
+                        <p><strong>Knowledge Objects:</strong> 
+                        <ul>
+                        {% for ko in hasKnowledgeObject %}
+                            <li>
+                            <a href="{{ ko.get("@id", ko.get("@value", "Undefined")) }}" target='_blank'>
+                                {{ ko.get("@id", ko.get("@value", "Undefined")) }}
+                            </a>
+                            </li>
+                        {% endfor %}
+                        </ul>
+                        </p>
+                    {% endif %}                    
+
                     {% if knowledge.get("http://purl.obolibrary.org/obo/RO_0002502") %}
                         <p><strong>Depends on:</strong> {{ knowledge.get("http://purl.obolibrary.org/obo/RO_0002502",  [{}])[0].get("@id", "Undefined").split('/')[-1] }}</p>
                     {% endif %}
@@ -395,8 +422,8 @@ def information_page(
                         {{ knowledge.get("http://purl.org/dc/elements/1.1/date", [{"@value":"Undefined"}])[0]["@value"] }}
                     </p>
                     {% endif %}
-                    <b>Creator Information:</b>
                     {% if knowledge.get("http://schema.org/creator") %}
+                    <b>Creator Information:</b>
                     <p><strong>Name:</strong> 
                     {{ knowledge.get("http://schema.org/creator", [{}])[0].get("http://schema.org/givenName",[{"@value":""}])[0]["@value"] }} {{ knowledge.get("http://schema.org/creator", [{}])[0].get("http://schema.org/lastName", [{"@value":""}])[0]["@value"] }} {{ knowledge.get("http://schema.org/creator", [{}])[0].get("http://schema.org/name",[{"@value":""}])[0]["@value"] }}
                     </p>
@@ -433,18 +460,27 @@ def information_page(
                             {{ service.get("@type", ["Undefined"])[0]}}
                         </a>
                 </p>
-                <p><strong>Depends on:</strong> {{ service.get("http://purl.obolibrary.org/obo/RO_0002502", [{}])[0].get("@id", "Undefined").split('/')[-1] }}</p>
-                <p><strong>Implemented by:</strong> 
-                    {% if service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") | filename == "" or service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") | filename == "." %}
-                        <a href="{{ service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") }}" target='_blank'>
-                            {{ service.get("@id", "").replace("_:","")}}
-                        </a>
-                    {% else%}
-                        <a href="{{ service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") }}" target='_blank'>
-                            {{ service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") | filename}}
-                        </a>                                 
-                    {% endif %}                     
+                <p><strong>Depends on:</strong> 
+                
+                {% for depend in service.get("http://purl.obolibrary.org/obo/RO_0002502", [{}]) %}
+                    {{ depend.get("@id", "Undefined").split('/')[-1] }}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+                
                 </p>
+                {% set implemented_by = service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}]) %}
+                {% if implemented_by != [{}]%}
+                    <p><strong>Implemented by:</strong> 
+                        {% if service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") | filename == "" or service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") | filename == "." %}
+                            <a href="{{ service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") }}" target='_blank'>
+                                {{ service.get("@id", "").replace("_:","")}}
+                            </a>
+                        {% else%}
+                            <a href="{{ service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") }}" target='_blank'>
+                                {{ service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") | filename}}
+                            </a>                                 
+                        {% endif %}                     
+                    </p>
+                {% endif %}
             {% endfor %}
             {% endif %}
         </div>            
@@ -619,14 +655,14 @@ def init(name: str):
 # )
 # package("/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json", nested=True)
 
+information_page(
+    "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/metadata.json",
+    "/home/faridsei/dev/code/USPSTF-collection/abdominal-aortic-aneurysm-screening/index.html",
+    False,
+)
 # information_page(
-#     "/home/faridsei/dev/code/USPSTF-collection/cardiovascular-prevention-statin-use/metadata.json",
-#     "/home/faridsei/dev/code/USPSTF-collection/cardiovascular-prevention-statin-use/index.html",
-#     True,
-# )
-# information_page(
-#     "/home/faridsei/dev/code/knowledge-base-mpog/metadata.json",
-#     "/home/faridsei/dev/code/knowledge-base-mpog/index.html",
+#     "/home/faridsei/dev/code/pgx-knowledge-base/pgx-kb/metadata.json",
+#     "/home/faridsei/dev/code/pgx-knowledge-base/pgx-kb/index.html",
 #     False,
 # )
 # information_page(
