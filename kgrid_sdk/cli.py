@@ -470,15 +470,21 @@ def information_page(
                 {% set implemented_by = service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}]) %}
                 {% if implemented_by != [{}]%}
                     <p><strong>Implemented by:</strong> 
-                        {% if service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") | filename == "" or service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") | filename == "." %}
-                            <a href="{{ service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") }}" target='_blank'>
-                                {{ service.get("@id", "").replace("_:","")}}
-                            </a>
-                        {% else%}
-                            <a href="{{ service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") }}" target='_blank'>
-                                {{ service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}])[0].get("@id", "Undefined") | filename}}
-                            </a>                                 
-                        {% endif %}                     
+                    <ul>
+                        {% for implementation in implemented_by %}
+                            <li>
+                            {% if implementation.get("@id", "Undefined") | filename == "" or implementation.get("@id", "Undefined") | filename == "." %}
+                                <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank'>
+                                    {{ service.get("@id", "").replace("_:","")}}
+                                </a>
+                            {% else%}
+                                <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank'>
+                                    {{ implementation.get("@id", "Undefined") | filename}}
+                                </a>                                 
+                            {% endif %}   
+                            </li>
+                        {% endfor %}      
+                        </ul>            
                     </p>
                 {% endif %}
             {% endfor %}
@@ -682,6 +688,11 @@ def init(name: str):
 # information_page(
 #     "/home/faridsei/dev/code/pgx-knowledge-base/pgx-kb/metadata.json",
 #     "/home/faridsei/dev/code/pgx-knowledge-base/pgx-kb/index.html",
+#     False,
+# )
+# information_page(
+#     "/home/faridsei/dev/code/pgx-knowledge-assembly/collection/CPIC_Phenotype_CYP2D6/metadata.json",
+#     "/home/faridsei/dev/code/pgx-knowledge-assembly/collection/CPIC_Phenotype_CYP2D6/index.html",
 #     False,
 # )
 # init("test")
