@@ -1,12 +1,37 @@
-# KGrid SDK
-Use KGrid SDK library for 
-- Creating a python Knowledge object
-- Creating a collection
+# KGrid SDK - a Python SDK
 
-Use KGrid SDK CLI for
-- Initiating a KGrid Knowledge Object
-- Creating an Information Page for a Knowledge Object or Knowledgebase
-- Metadata-Driven Packaging of a Knowledge Object
+## Introduction
+
+The KGrid Software Development Kit (KGrid SDK) is a command-line tool resulting from work to develop new infrastructure to streamline both the creation and the integration of Knowledge Objects (KOs). The KGrid SDK's two main roles are (1) to faciliate the addition of stock or general Services and their implementations inside KOs and (2) to help generate and render highly consistent KO metadata based on the KOIO ontology for describing the parts and pieces of KOs. The KGrid-SDK is intended to be used by programmers familar with Python.
+
+## Two Components of the KGrid-SDK
+
+The KGrid-SDK has two separate components. 
+
+The first component is a KGrid SDK Python Library (or Python Package) that provides classes which can be imported into any CBK artifact, thereby providing help adding stock services to the CBK artifact. 
+- Service Classes for Adding CLI or API services to Python-based CBK artifacts inside KOs
+- Colletion Class for Creating a Collection (or Knowledgebase or Knowledge Assembly) of KOs
+
+The second component is a stand-alone command line interface tools (the KGrid SDK CLI) for
+- Initiating a new KO
+- Creating an Information Page for a KO
+- Metadata-Driven Packaging of a KO
+
+## Feature List
+
+For adding stock Services or combining KOs into Collections, the KGrid SDK Python Library provides the following five classes:
+- Ko, for adding services that report various metadata for a KO (e.g., get_version, get_ID, get_metadata)
+- Ko_execution, implements a universal wrapper method to parse inputs and enable the CBK in a KO to be called 
+- Ko_API, for adding an API service to engage the CBK in a KO
+- Ko_CLI, for adding a command-line interface to engage the CBK in a KO
+- knowledgebase, for combining KOs into a new "knowledgebase KO" and executing all included CBK functions in the knowledgebase in one go
+
+For more help creating new KOs, the KGrid SDK's CLI provides the following features and capabilities
+- Init function to instantiate a KO's metadata and add a license and ReadMe to any KO
+- Information Page function to render KO metadata in HTML, which any browser can display in a human-readable form with working links 
+- Metadata-driven packaging function to put all necessary files for a single KO into a ZIP package for sharing and distribution
+
+More details about all of these features are given below.
 
 ## Create a python Knowledge Object
 You can use this package to implement python Knowledge Objects.
