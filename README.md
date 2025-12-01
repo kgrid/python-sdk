@@ -31,10 +31,10 @@ For more help creating new KOs, the KGrid SDK's CLI provides the following featu
 - Information Page function to render KO metadata in HTML, which any browser can display in a human-readable form with working links 
 - Metadata-driven packaging function to put all necessary files for a single KO into a ZIP package for sharing and distribution
 
-More details about all of these features are given below.
+More details about all of these features are given below, starting with using the Python Library to create a python KO. 
 
 ## Create a python Knowledge Object
-You can use this package to implement python Knowledge Objects.
+You can use this python library (or package) to implement python Knowledge Objects.
 
 ### Add  kgrid_sdk package as a dependency in your Knowledge Object
 The `kgrid_sdk` package is available on PyPI and can be easily added as a dependency to your project. Here’s how to include it in your project based on your setup:
