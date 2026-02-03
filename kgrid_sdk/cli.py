@@ -302,13 +302,19 @@ def information_page(
             <div class="metadata" id="metadata">
             <h1>{{ metadata.get("http://purl.org/dc/elements/1.1/title", [{"@value":"Untitled"}])[0]["@value"] }}</h1>
             <p>{{ metadata.get("http://purl.org/dc/elements/1.1/description", [{"@value":"Untitled"}])[0]["@value"].replace("\n", "<br>") }}</p>
-            <p><strong>Id:</strong> <a href="{{base_iri}}" target='_blank'> 
+            <p><strong>ID:</strong> <a href="{{base_iri}}" target='_blank'> 
                 {{ metadata.get("@id", "Undefined").split('/')[-1] }}
             </a></p>
+            <p><strong>Information page metadata:</strong> <a href="{{base_iri}}/metadata.json" target='_blank'> 
+                metadata.json 
+            </a></p>
             <p><strong>Identifier:</strong> {{ metadata.get("http://purl.org/dc/elements/1.1/identifier", [{"@value":"Undefined"}])[0]["@value"] }}</p>
-            <p><strong>Type:</strong> <a href="{{ expanded_metadata[0].get('@type', [''])[0] }}" target='_blank'>{{ metadata.get('@type', ['Undefined'])[0] }}</a></p>
+            <p><strong>Type:</strong> <a href="{{ expanded_metadata[0].get('@type', [''])[0] }}" target='_blank'>{{ metadata.get('@type', ['Undefined'])[0].replace("https://kgrid.org/koio#","") }}</a></p>
             <p><strong>Version:</strong> {{ metadata.get("http://purl.org/dc/elements/1.1/version", [{"@value":"Undefined"}])[0]["@value"] }}</p>
             <p><strong>Date:</strong> {{ metadata.get("http://purl.org/dc/elements/1.1/date", [{"@value":"Undefined"}])[0]["@value"] }}</p>
+            {%if metadata.get("http://schema.org/funder", [{"@value":"Undefined"}]) != [{"@value":"Undefined"}]%}
+                <p><strong>Funder:</strong> {{ metadata.get("http://schema.org/funder", [{"@value":"Undefined"}])[0]["@value"] }}</p>
+            {% endif %}
             {% if metadata.get("http://purl.org/dc/elements/1.1/license") %}
             <p><strong>License:</strong> 
                     <a href="{{ metadata.get("http://purl.org/dc/elements/1.1/license", [{}])[0].get("@id", "undefined") }}" target='_blank'>
@@ -323,20 +329,75 @@ def information_page(
                 </p>
             {% endif %}
             <hr>
-            <h2>Creator Information</h2>
-            <p><strong>Name:</strong> {{ metadata.get("http://schema.org/creator",  [{}])[0].get("http://schema.org/givenName", [{"@value":""}])[0]["@value"] }}
-                {{ metadata.get("http://schema.org/creator", [{}])[0].get("http://schema.org/familyName",[{"@value":""}])[0]["@value"] }} {{ metadata.get("http://schema.org/creator", [{}])[0].get("http://schema.org/name", [{"@value":""}])[0]["@value"] }}</p>
-            <p><strong>Affiliation:</strong> {{ metadata.get("http://schema.org/creator", [{}])[0].get("http://schema.org/affiliation", [{"@value":"Undefined"}])[0]["@value"] }}</p>
-            <p><strong>Email:</strong> 
-                <a href="mailto:{{ metadata.get('http://schema.org/creator',  [{}])[0].get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
-                    {{ metadata.get('http://schema.org/creator',  [{}])[0].get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}
-                </a>
-            </p>
-            <p><strong>Website:</strong> 
-                <a href="{{ metadata.get('http://schema.org/creator', [{}])[0].get('@id', 'Undefined') }}" target='_blank'>
-                    {{ metadata.get('http://schema.org/creator',  [{}])[0].get('@id', 'Undefined') }}
-                </a>
-            </p>
+            
+            {% set creators = metadata.get("http://schema.org/creator", [{}]) %}
+            {% if creators != [{}] %}
+                <h2>Creator</h2>
+                {% set creators = [creators] if creators is mapping else creators %} 
+                <ul>  
+                {% for creator in creators %} 
+                    <li>
+                        <h3> {{ creator.get("http://schema.org/givenName", [{"@value":""}])[0]["@value"] }}
+                            {{ creator.get("http://schema.org/familyName",[{"@value":""}])[0]["@value"] }} {{ creator.get("http://schema.org/name", [{"@value":""}])[0]["@value"] }}</h3>
+                        <p><strong>Affiliation:</strong> {{ creator.get("http://schema.org/affiliation", [{"@value":"Undefined"}])[0]["@value"] }}</p>
+                        {% if creator.get('http://schema.org/roleName', [{"@value":"Undefined"}]) != [{"@value":"Undefined"}] %}
+                            <p><strong>Role:</strong>                                
+                                {{ creator.get('http://schema.org/roleName', [{"@value":"Undefined"}])[0]["@value"] }}
+                            </p>
+                        {% endif %}
+                        {% if creator.get('http://schema.org/email', [{"@value":"Undefined"}]) != [{"@value":"Undefined"}] %}
+                            <p><strong>Email:</strong> 
+                                <a href="mailto:{{ creator.get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
+                                    {{ creator.get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}
+                                </a>
+                            </p>
+                        {% endif %}
+                        <p><strong>Website:</strong> 
+                            <a href="{{ creator.get('@id', 'Undefined') }}" target='_blank'>
+                                {{ creator.get('@id', 'Undefined') }}
+                            </a>
+                        </p>
+                    </li>
+                {% endfor %}   
+                </ul>
+            {% endif %}
+            {% if metadata.get("http://schema.org/contributor") %}
+                <h2>Contributor</h2>
+                <p><strong>Name:</strong> {{ metadata.get("http://schema.org/contributor",  [{}])[0].get("http://schema.org/givenName", [{"@value":""}])[0]["@value"] }}
+                    {{ metadata.get("http://schema.org/contributor", [{}])[0].get("http://schema.org/familyName",[{"@value":""}])[0]["@value"] }} {{ metadata.get("http://schema.org/contributor", [{}])[0].get("http://schema.org/name", [{"@value":""}])[0]["@value"] }}</p>
+                <p><strong>Affiliation:</strong> {{ metadata.get("http://schema.org/contributor", [{}])[0].get("http://schema.org/affiliation", [{"@value":"Undefined"}])[0]["@value"] }}</p>
+                <p><strong>Email:</strong> 
+                    <a href="mailto:{{ metadata.get('http://schema.org/contributor',  [{}])[0].get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
+                        {{ metadata.get('http://schema.org/contributor',  [{}])[0].get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}
+                    </a>
+                </p>
+                <p><strong>Website:</strong> 
+                    <a href="{{ metadata.get('http://schema.org/contributor', [{}])[0].get('@id', 'Undefined') }}" target='_blank'>
+                        {{ metadata.get('http://schema.org/contributor',  [{}])[0].get('@id', 'Undefined') }}
+                    </a>
+                </p>
+            {% endif %}
+            
+            {% if metadata.get("http://purl.org/dc/elements/1.1/publisher") %}
+                <p><h2>Publisher</h2> 
+                    {{ metadata.get("http://purl.org/dc/elements/1.1/publisher", [{"@value":"Undefined"}])[0]["@value"] }}
+                </p>
+            {% endif %}
+            
+            {% set isReferencedBys = metadata.get("http://purl.org/dc/elements/1.1/isReferencedBy", [{}]) %}                  
+            {% if isReferencedBys != [{}] %}
+                </p><b>Is referenced by:</b></p>
+                {% set isReferencedBys = [isReferencedBys] if isReferencedBys is mapping else isReferencedBys %}   
+                <ul>                 
+                {% for isReferencedBy in isReferencedBys %} 
+                    <li>     
+                    <a href="{{ isReferencedBy["@id"] }}" target='_blank'>
+                        {{ isReferencedBy["http://purl.org/dc/elements/1.1/bibliographicCitation"][0]["@value"] }}
+                    </a>
+                    </li>
+                {% endfor %}   
+                </ul>
+            {% endif %}
 
             {% if knowledge_items!=[] %}
                 <hr>
@@ -354,14 +415,82 @@ def information_page(
                     
                     <p><strong>Type:</strong> 
                             <a href="{{ knowledge.get("@type", ["Undefined"])[0] }}" target='_blank'>
-                                {{ knowledge.get("@type", ["Undefined"])[0] }}
+                                {{ knowledge.get("@type", ["Undefined"])[0].replace("https://kgrid.org/koio#","") }}
                             </a>
                     </p>
                     {% if knowledge.get("http://purl.org/dc/elements/1.1/description") %}
                         <p><strong>Description:</strong> {{ knowledge.get("http://purl.org/dc/elements/1.1/description", [{"@value":""}])[0]["@value"] }}</p>
                     {% endif %}
-                    {% set implemented_by = knowledge.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}]) %}
-                    
+                    {% if knowledge.get("http://purl.org/dc/elements/1.1/publisher") %}
+                        <p><strong>Publisher:</strong> 
+                            {{ knowledge.get("http://purl.org/dc/elements/1.1/publisher", [{"@value":"Undefined"}])[0]["@value"] }}
+                        </p>
+                    {% endif %}
+                    {% if knowledge.get("http://purl.org/dc/elements/1.1/date") %}
+                        <p><strong>Date:</strong> 
+                            {{ knowledge.get("http://purl.org/dc/elements/1.1/date", [{"@value":"Undefined"}])[0]["@value"] }}
+                        </p>
+                    {% endif %}
+                    {% set creators = knowledge.get("http://schema.org/creator", [{}]) %}
+                    {% if creators != [{}] %}
+                        <b>Creator:</b>
+                        {% set creators = [creators] if creators is mapping else creators %}   
+                        <ul>                 
+                        {% for creator in creators %} 
+                            <li>  
+                                <p>
+                                {{ creator.get("http://schema.org/givenName",[{"@value":""}])[0]["@value"] }} {{ creator.get("http://schema.org/lastName", [{"@value":""}])[0]["@value"] }} {{ creator.get("http://schema.org/name",[{"@value":""}])[0]["@value"] }}
+                                </p>
+                                {% if creator.get("http://schema.org/affiliation")%}
+                                <p><strong>Affiliation:</strong> 
+                                {{ creator.get("http://schema.org/affiliation",[{"@value":""}])[0]["@value"] }} 
+                                </p>
+                                {% endif %}
+                                {% if knowledge.get("http://schema.org/creator",[{}])[0].get("http://schema.org/email")%}
+                                <p><strong>Email:</strong> 
+                                    <a href="mailto:{{ creator.get("http://schema.org/email", [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
+                                        {{ creator.get("http://schema.org/email", [{"@value":"Undefined"}])[0]["@value"] }}
+                                    </a>
+                                </p>
+                                {% endif %}
+                                {% if creator.get("@id")%}
+                                <p><strong>Website:</strong> 
+                                    <a href="mailto:{{ creator.get("@id", "Undefined") }}" target='_blank'>
+                                        {{ creator.get("@id", "Undefined") }}
+                                    </a>
+                                </p>
+                            </li>      
+                            {% endif %}
+                        {% endfor %}   
+                        </ul>
+                    {% endif %}
+                    {% if knowledge.get("http://purl.org/dc/elements/1.1/source") %}
+                        <p><strong>Source:</strong> 
+                            <a href="{{ knowledge.get("http://purl.org/dc/elements/1.1/source", [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
+                                {{ knowledge.get("http://purl.org/dc/elements/1.1/source", [{"@value":"Undefined"}])[0]["@value"] }}
+                            </a>
+                        </p>
+                    {% endif %}            
+                    {% set isReferencedBys = knowledge.get("http://purl.org/dc/elements/1.1/isReferencedBy", [{}]) %}                  
+                    {% if isReferencedBys != [{}] %}
+                        </p><b>Is referenced by:</b></p>
+                        {% set isReferencedBys = [isReferencedBys] if isReferencedBys is mapping else isReferencedBys %}   
+                        <ul>                 
+                        {% for isReferencedBy in isReferencedBys %} 
+                            <li>     
+                            <a href="{{ isReferencedBy["@value"] }}" target='_blank'>
+                                {{ isReferencedBy["@value"] }}
+                            </a>
+                            </li>
+                        {% endfor %}   
+                        </ul>
+                    {% endif %}
+                    {% if knowledge.get("http://schema.org/endorsers") %}
+                        <p><strong>Endorsers:</strong> 
+                            {{ knowledge.get("http://schema.org/endorsers", [{"@value":"Undefined"}])[0]["@value"] }}
+                        </p>
+                    {% endif %}
+                    {% set implemented_by = knowledge.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}]) %}                   
                     {% if implemented_by != [{}]%}
                         {% set implemented_by = [implemented_by] if implemented_by is mapping else implemented_by %}
                         <p><strong>Implemented by:</strong> 
@@ -372,22 +501,12 @@ def information_page(
                                 {{ implementation.get("http://purl.org/dc/elements/1.1/title") if implementation.get("http://purl.org/dc/elements/1.1/title") else implementation.get("@id", "Undefined") | filename}}
                             </a><br/>(type: 
                                 {% set imp_types = implementation.get("@type", "Undefined")%}
-                                
-                                {% for imp_type in imp_types %}  
-                                    
-                                        <a href="{{ imp_type }}" target='_blank'>
-                                            {{ imp_type }}
-                                        </a>{% if not loop.last %}, {% endif %}
-                                      
-                                {% endfor %}
-                                
-                                )
+                                {% for imp_type in imp_types %}<a href="{{ imp_type }}" target='_blank'>{{ imp_type.replace(base_iri , "").replace("/" , "")}}</a>{% if not loop.last %}, {% endif %}{% endfor %})
                             </li>
                         {% endfor %}
                         </ul>
                         </p>
-                    {% endif %}                 
-        
+                    {% endif %}                  
                     {% if hasKnowledgeObject != [{}]%}
                         <p><strong>Knowledge Objects:</strong> 
                         <ul>
@@ -401,63 +520,28 @@ def information_page(
                         </ul>
                         </p>
                     {% endif %}                    
-
                     {% if knowledge.get("http://purl.obolibrary.org/obo/RO_0002502") %}
                         <p><strong>Depends on:</strong> {{ knowledge.get("http://purl.obolibrary.org/obo/RO_0002502",  [{}])[0].get("@id", "Undefined").split('/')[-1] }}</p>
                     {% endif %}
-                    {% if knowledge.get("http://purl.org/dc/elements/1.1/source") %}
-                    <p><strong>Source:</strong> 
-                        <a href="{{ knowledge.get("http://purl.org/dc/elements/1.1/source", [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
-                            {{ knowledge.get("http://purl.org/dc/elements/1.1/source", [{"@value":"Undefined"}])[0]["@value"] }}
-                        </a>
-                    </p>
-                    {% endif %}
+                    
                     {% if knowledge.get("http://purl.org/dc/elements/1.1/format") %}
                     <p><strong>Format:</strong> 
                         {{ knowledge.get("http://purl.org/dc/elements/1.1/format", [{"@value":"Undefined"}])[0]["@value"] }}
                     </p>
-                    {% endif %}
-                    {% if knowledge.get("http://purl.org/dc/elements/1.1/date") %}
-                    <p><strong>Date:</strong> 
-                        {{ knowledge.get("http://purl.org/dc/elements/1.1/date", [{"@value":"Undefined"}])[0]["@value"] }}
-                    </p>
-                    {% endif %}
-                    {% if knowledge.get("http://schema.org/creator") %}
-                    <b>Creator Information:</b>
-                    <p><strong>Name:</strong> 
-                    {{ knowledge.get("http://schema.org/creator", [{}])[0].get("http://schema.org/givenName",[{"@value":""}])[0]["@value"] }} {{ knowledge.get("http://schema.org/creator", [{}])[0].get("http://schema.org/lastName", [{"@value":""}])[0]["@value"] }} {{ knowledge.get("http://schema.org/creator", [{}])[0].get("http://schema.org/name",[{"@value":""}])[0]["@value"] }}
-                    </p>
-                    {% if knowledge.get("http://schema.org/creator", [{}])[0].get("http://schema.org/affiliation")%}
-                    <p><strong>Affiliation:</strong> 
-                    {{ knowledge.get("http://schema.org/creator", [{}])[0].get("http://schema.org/affiliation",[{"@value":""}])[0]["@value"] }} 
-                    </p>
-                    {% endif %}
-                    {% if knowledge.get("http://schema.org/creator",[{}])[0].get("http://schema.org/email")%}
-                    <p><strong>Email:</strong> 
-                        <a href="mailto:{{ knowledge.get("http://schema.org/creator", [{}])[0].get("http://schema.org/email", [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
-                            {{ knowledge.get("http://schema.org/creator", [{}])[0].get("http://schema.org/email", [{"@value":"Undefined"}])[0]["@value"] }}
-                        </a>
-                    </p>
-                    {% endif %}
-                    {% if knowledge.get("http://schema.org/creator", [{}])[0].get("@id")%}
-                    <p><strong>Website:</strong> 
-                        <a href="mailto:{{ knowledge.get("http://schema.org/creator", [{}])[0].get("@id", "Undefined") }}" target='_blank'>
-                            {{ knowledge.get("http://schema.org/creator", [{}])[0].get("@id", "Undefined") }}
-                        </a>
-                    </p>
-                    {% endif %}
-                    {% endif %}
+                    {% endif %}                   
                 {% endfor %}
             {% endif %}
 
             {% if services != [] %}
             <hr>
             <h2>Services</h2>
+            
             {% for service in services %}
+
                 <p><h3> {{ service.get("@id", "").split('/')[-1] }}</h3></p>
                 <p><strong>Type:</strong> 
                         <a href="{{ service.get("@type", ["Undefined"])[0] }}" target='_blank'>
-                            {{ service.get("@type", ["Undefined"])[0]}}
+                            {{ service.get("@type", ["Undefined"])[0].replace("https://kgrid.org/koio#","") }}
                         </a>
                 </p>
                 <p><strong>Depends on:</strong> 
@@ -467,6 +551,13 @@ def information_page(
                 {% endfor %}
                 
                 </p>
+                {% if service.get("http://www.ebi.ac.uk/swo/SWO_0004001") %}
+                        <p><strong>Has interface:</strong> 
+                            <a href="{{ service.get("http://www.ebi.ac.uk/swo/SWO_0004001", [{"@id":"Undefined"}])[0]["@id"] }}" target='_blank'>
+                                {{ service.get("http://www.ebi.ac.uk/swo/SWO_0004001", [{"@value":"Undefined"}])[0]["@id"] }}
+                            </a>
+                        </p>
+                {% endif %} 
                 {% set implemented_by = service.get("http://www.ebi.ac.uk/swo/SWO_0000085", [{}]) %}
                 {% if implemented_by != [{}]%}
                     <p><strong>Implemented by:</strong> 
@@ -495,13 +586,25 @@ def information_page(
             <div class="doc-section" id="doc-section">
             {% if documentation %}
                 <h2>Documentation</h2>
+                <ul>
                 {% for doc in documentation %}
-                    <h3><a href="{{ doc.get('@id', '#') }}" target='_blank'>{{ doc.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a></h3>
-                    <p>{{ doc.get('http://purl.org/dc/elements/1.1/description', [{"@value":"No description"}])[0]["@value"] }}</p>
-                    {% if doc.get("item_of","")!="" %}
-                        <p><strong>Document of</strong> {{doc.get("item_of","")[0]["@value"]}} ({{ doc.get("type","") }}) </p>
-                    {% endif %}
+                    <li>
+                        <h3><a href="{{ doc.get('@id', '#') }}" target='_blank'>{{ doc.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a></h3>
+                        <p>{{ doc.get('http://purl.org/dc/elements/1.1/description', [{"@value":"No description"}])[0]["@value"] }}</p>
+                        {% if doc.get("item_of","")!="" %}
+                            <p><strong>Document of:</strong> {{doc.get("item_of","")[0]["@value"]}} ({{ doc.get("type","") }}) </p>
+                        {% endif %}
+                        <p><strong>Type:</strong> 
+                        {% set imp_types = doc.get('@type', '#')%}
+                        {% for imp_type in imp_types %}  
+                                <a href="{{ imp_type }}" target='_blank'>
+                                    {{ imp_type.replace("https://kgrid.org/koio#","").split("/")[-1]}}
+                                </a>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                        <br/><br/>
+                    </li>
                 {% endfor %}
+                </ul>
             {% else %}
                 <p>No documentation available</p>
             {% endif %}
@@ -510,13 +613,24 @@ def information_page(
             <div class="test-section" id="test-section">
             {% if tests %}
                 <h2>Tests</h2>
+                <ul>
                 {% for test in tests %}
-                    <h3><a href="{{ test.get('http://www.ebi.ac.uk/swo/SWO_0000085', [{}])[0].get('@id', '#') }}" target='_blank'>{{ test.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a></h3>
-                    <p>{{ test.get('http://purl.org/dc/elements/1.1/description', [{"@value":"No description"}])[0]["@value"] }}</p>
-                    {% if test.get("item_of","")!="" %}
-                        <p><strong>Test of</strong> {{test.get("item_of","")[0]["@value"]}} ({{ test.get("type","") }}) </p>
-                    {% endif %}
+                    <li>
+                        <h3><a href="{{ test.get('http://www.ebi.ac.uk/swo/SWO_0000085', [{}])[0].get('@id', '#') }}" target='_blank'>{{ test.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a></h3>
+                        <p>{{ test.get('http://purl.org/dc/elements/1.1/description', [{"@value":"No description"}])[0]["@value"] }}</p>
+                        {% if test.get("item_of","")!="" %}
+                            <p><strong>Test of:</strong> {{test.get("item_of","")[0]["@value"]}} ({{ test.get("type","") }}) </p>
+                        {% endif %}
+                        <p><strong>Type:</strong> 
+                        {% set imp_types = test.get('http://www.ebi.ac.uk/swo/SWO_0000085', [{}])[0].get('@type', '#')%}
+                        {% for imp_type in imp_types %}  
+                                <a href="{{ imp_type }}" target='_blank'>
+                                    {{ imp_type.split("/")[-1]}}
+                                </a>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    </li>
                 {% endfor %}
+                </ul>
             {% else %}
                 <p>No tests available</p>
             {% endif %}
@@ -686,13 +800,30 @@ def init(name: str):
 #     False,
 # )
 # information_page(
-#     "/home/faridsei/dev/code/pgx-knowledge-base/pgx-kb/metadata.json",
-#     "/home/faridsei/dev/code/pgx-knowledge-base/pgx-kb/index.html",
+#     "/home/faridsei/dev/test/knowledge-base-obi/metadata.json",
+#     "/home/faridsei/dev/test/knowledge-base-obi/index.html",
 #     False,
 # )
 # information_page(
 #     "/home/faridsei/dev/code/pgx-knowledge-assembly/collection/CPIC_Phenotype_CYP2D6/metadata.json",
 #     "/home/faridsei/dev/code/pgx-knowledge-assembly/collection/CPIC_Phenotype_CYP2D6/index.html",
+#     False,
+# )
+# information_page(
+#     "/home/faridsei/dev/test/knowledge-base-sandbox/metadata.json",
+#     "/home/faridsei/dev/test/knowledge-base-sandbox/index.html",
+#     False,
+# )
+
+information_page(
+    "/home/faridsei/dev/code/ICPSR-ex1-MIHD/metadata.json",
+    "/home/faridsei/dev/code/ICPSR-ex1-MIHD/index.html",
+    False,
+)
+
+# information_page(
+#     "/home/faridsei/dev/code/nephroticsyndrome-computablephenotype/metadata.json",
+#     "/home/faridsei/dev/code/nephroticsyndrome-computablephenotype/index.html",
 #     False,
 # )
 # init("test")
