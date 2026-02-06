@@ -165,7 +165,7 @@ def information_page(
     # Expand metadata using JSON-LD for context required expantions
     base_iri = "."
     expanded_metadata = jsonld.expand(metadata, {"base": base_iri})
-
+    unexpanded_metadata = metadata
     context = {"@context": metadata["@context"]}
     # Check if context["@context"] is a URL then load it
     if isinstance(context["@context"], str):
@@ -221,7 +221,7 @@ def information_page(
             margin: 20px;
         }
         .container {
-            max-width: 1000px;
+            max-width: 1400px;
             margin: auto;
             display: flex;
             width: 100%;
@@ -302,13 +302,24 @@ def information_page(
             <div class="metadata" id="metadata">
             <h1>{{ metadata.get("http://purl.org/dc/elements/1.1/title", [{"@value":"Untitled"}])[0]["@value"] }}</h1>
             <p>{{ metadata.get("http://purl.org/dc/elements/1.1/description", [{"@value":"Untitled"}])[0]["@value"].replace("\n", "<br>") }}</p>
-            <p><strong>ID:</strong> <a href="{{base_iri}}" target='_blank'> 
-                {{ metadata.get("@id", "Undefined").split('/')[-1] }}
+            <p><strong>ID:</strong> <a href="{{unexpanded_metadata.get("@id", "Undefined") if "http" in unexpanded_metadata.get("@id", "Undefined") else base_iri  }}" target='_blank'> 
+                {{ unexpanded_metadata.get("@id", "Undefined") if "http" in unexpanded_metadata.get("@id", "Undefined") else metadata.get("@id", "Undefined").split("/")[-1] }}
             </a></p>
             <p><strong>Information page metadata:</strong> <a href="{{base_iri}}/metadata.json" target='_blank'> 
                 metadata.json 
             </a></p>
-            <p><strong>Identifier:</strong> {{ metadata.get("http://purl.org/dc/elements/1.1/identifier", [{"@value":"Undefined"}])[0]["@value"] }}</p>
+            
+            {% set identifiers = metadata.get("http://purl.org/dc/elements/1.1/identifier", [{}]) %}
+            {% if identifiers != [{}] %}
+                <strong>Identifier:</strong>
+                {% set identifiers = [identifiers] if identifiers is mapping else identifiers %}                 
+                {% for identifier in identifiers %}                     
+                    {{ identifier["@value"]}}{% if not loop.last %}, {% endif %}      
+                {% endfor %}
+            {% endif %}
+            
+            
+            
             <p><strong>Type:</strong> <a href="{{ expanded_metadata[0].get('@type', [''])[0] }}" target='_blank'>{{ metadata.get('@type', ['Undefined'])[0].replace("https://kgrid.org/koio#","") }}</a></p>
             <p><strong>Version:</strong> {{ metadata.get("http://purl.org/dc/elements/1.1/version", [{"@value":"Undefined"}])[0]["@value"] }}</p>
             <p><strong>Date:</strong> {{ metadata.get("http://purl.org/dc/elements/1.1/date", [{"@value":"Undefined"}])[0]["@value"] }}</p>
@@ -650,6 +661,7 @@ def information_page(
     html = template.render(
         metadata=metadata,
         expanded_metadata=expanded_metadata,
+        unexpanded_metadata=unexpanded_metadata,
         documentation=documentation,
         tests=tests,
         knowledge_items=knowledge_items,
