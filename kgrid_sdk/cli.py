@@ -423,7 +423,10 @@ def information_page(
                     {% else%}</p>
                         <p><h3> {{ knowledge.get("http://purl.org/dc/elements/1.1/title", [{"@value": knowledge.get("@id", "").split('/')[-1]}])[0]["@value"] }}</h3></p>
                     {% endif %}     
-                    
+                    <p><strong>ID:</strong> 
+                        {{ knowledge.get("@id", "").split('/')[-1] }}
+                    </p>
+
                     <p><strong>Type:</strong> 
                             <a href="{{ knowledge.get("@type", ["Undefined"])[0] }}" target='_blank'>
                                 {{ knowledge.get("@type", ["Undefined"])[0].replace("https://kgrid.org/koio#","") }}
