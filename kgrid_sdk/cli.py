@@ -257,12 +257,10 @@ def information_page(
         .doc-section, .test-section {
             
             right: 20px;
-            width: 250px;
             color: black;
             padding: 10px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            max-width: 250px;
             font-size: 16px;
         }
         .doc-section {
@@ -416,6 +414,8 @@ def information_page(
                 {% for knowledge in knowledge_items %}
                     {% set hasKnowledgeObject = knowledge.get("https://kgrid.org/koio#hasKnowledgeObject", [{}]) %}
                     {% set knowledgeType = knowledge.get("@type", ["Undefined"])[0]%}
+                    {% set knowledge_anchor = knowledge.get("@id", "").split('/')[-1] %}
+                    <a id="{{ knowledge_anchor }}"></a>
                     {% if knowledgeType ==  "https://kgrid.org/koio#KnowledgeSet" and hasKnowledgeObject ==  [{}]%}  
                         <p><a href='{{ knowledge.get("@id", "") }}' target='_blank'>
                             <h3> {{ knowledge.get("http://purl.org/dc/elements/1.1/title", [{"@value": knowledge.get("@id", "").split('/')[-1]}])[0]["@value"] }}</h3>
@@ -424,7 +424,7 @@ def information_page(
                         <p><h3> {{ knowledge.get("http://purl.org/dc/elements/1.1/title", [{"@value": knowledge.get("@id", "").split('/')[-1]}])[0]["@value"] }}</h3></p>
                     {% endif %}     
                     <p><strong>ID:</strong> 
-                        {{ knowledge.get("@id", "").split('/')[-1] }}
+                        {{ knowledge_anchor }}
                     </p>
 
                     <p><strong>Type:</strong> 
@@ -559,11 +559,14 @@ def information_page(
                         </a>
                 </p>
                 <p><strong>Depends on:</strong> 
-                
-                {% for depend in service.get("http://purl.obolibrary.org/obo/RO_0002502", [{}]) %}
-                    {{ depend.get("@id", "Undefined").split('/')[-1] }}{% if not loop.last %}, {% endif %}
+                {% set depends = service.get("http://purl.obolibrary.org/obo/RO_0002502", [{}]) %}
+                {% if depends is mapping %}
+                    {% set depends = [depends] %}
+                {% endif %}
+                {% for dep in depends %}
+                    {% set dep_anchor = dep.get("@id", "Undefined").split('/')[-1] %}
+                    <a href="#{{ dep_anchor }}">{{ dep_anchor }}</a>{% if not loop.last %}, {% endif %}
                 {% endfor %}
-                
                 </p>
                 {% if service.get("http://www.ebi.ac.uk/swo/SWO_0004001") %}
                         <p><strong>Has interface:</strong> 
