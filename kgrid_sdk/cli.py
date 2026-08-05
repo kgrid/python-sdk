@@ -300,6 +300,7 @@ def information_page(
             <div class="metadata" id="metadata">
             <h1>{{ metadata.get("http://purl.org/dc/elements/1.1/title", [{"@value":"Untitled"}])[0]["@value"] }}</h1>
             <p>{{ metadata.get("http://purl.org/dc/elements/1.1/description", [{"@value":"Untitled"}])[0]["@value"].replace("\n", "<br>") }}</p>
+            <hr>
             <p><strong>ID:</strong> <a href="{{unexpanded_metadata.get("@id", "Undefined") if "http" in unexpanded_metadata.get("@id", "Undefined") else base_iri  }}" target='_blank'> 
                 {{ unexpanded_metadata.get("@id", "Undefined") if "http" in unexpanded_metadata.get("@id", "Undefined") else metadata.get("@id", "Undefined").split("/")[-1] }}
             </a></p>
@@ -515,7 +516,7 @@ def information_page(
                                 {{ implementation.get("http://purl.org/dc/elements/1.1/title") if implementation.get("http://purl.org/dc/elements/1.1/title") else implementation.get("@id", "Undefined") | filename}}
                             </a><br/>(type: 
                                 {% set imp_types = implementation.get("@type", "Undefined")%}
-                                {% for imp_type in imp_types %}<a href="{{ imp_type }}" target='_blank'>{{ imp_type.replace(base_iri , "").replace("/" , "")}}</a>{% if not loop.last %}, {% endif %}{% endfor %})
+                                {% for imp_type in imp_types %}<a href="{{ imp_type }}" target='_blank'>{{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").split("/")[-1]}}</a>{% if not loop.last %}, {% endif %}{% endfor %})
                             </li>
                         {% endfor %}
                         </ul>
@@ -642,7 +643,7 @@ def information_page(
                         {% set imp_types = test.get('http://www.ebi.ac.uk/swo/SWO_0000085', [{}])[0].get('@type', '#')%}
                         {% for imp_type in imp_types %}  
                                 <a href="{{ imp_type }}" target='_blank'>
-                                    {{ imp_type.split("/")[-1]}}
+                                    {{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").split("/")[-1]}}
                                 </a>{% if not loop.last %}, {% endif %}
                         {% endfor %}
                     </li>
@@ -833,15 +834,31 @@ def init(name: str):
 #     False,
 # )
 
-information_page(
-    "/home/faridsei/dev/code/ICPSR-ex1-MIHD/metadata.json",
-    "/home/faridsei/dev/code/ICPSR-ex1-MIHD/index.html",
-    False,
-)
+# information_page(
+#     "/home/faridsei/dev/code/ICPSR-ex1-MIHD/metadata.json",
+#     "/home/faridsei/dev/code/ICPSR-ex1-MIHD/index.html",
+#     False,
+# )
+
+# information_page(
+#     "/home/faridsei/dev/code/EWS-Score-Analyzer-For-Patients-With-Diabetes/metadata.json",
+#     "/home/faridsei/dev/code/EWS-Score-Analyzer-For-Patients-With-Diabetes/index.html",
+#     False,
+# )
 
 # information_page(
 #     "/home/faridsei/dev/code/nephroticsyndrome-computablephenotype/metadata.json",
 #     "/home/faridsei/dev/code/nephroticsyndrome-computablephenotype/index.html",
+#     False,
+# )
+# information_page(
+#     "/home/faridsei/dev/code/knowledge-base/prioritization_algorithms/random_candidate_selector/metadata.json",
+#     "/home/faridsei/dev/code/knowledge-base/prioritization_algorithms/random_candidate_selector/index.html",
+#     False,
+# )
+# information_page(
+#     "/home/faridsei/dev/code/agent_experiments/template_filler1/filled_template.jsonld",
+#     "/home/faridsei/dev/code/agent_experiments/template_filler1/index.html",
 #     False,
 # )
 # init("test")

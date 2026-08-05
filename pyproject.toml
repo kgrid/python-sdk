@@ -9,7 +9,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 fastapi = { version = "^0.115.4", optional = true }
-typer = {version="^0.15.1", optional=true}
+typer = "^0.15.1"
 pyld = "^2.0.4"
 jinja2 = "^3.1.5"
 gitpython = "^3.1.44"
