@@ -460,6 +460,10 @@ def information_page(
             --line: #d9e1ea;
             --brand: #005ea8;
             --brand-2: #0d6b5f;
+            --legend-knowledge-stroke: #cc7a00;
+            --legend-service-stroke: #2d6ea3;
+            --legend-test-stroke: #2b8a3e;
+            --legend-doc-stroke: #7a4ab3;
             --surface-soft: #f6f9fc;
             --shadow: 0 2px 10px rgba(19, 34, 53, 0.06);
         }
@@ -839,6 +843,22 @@ def information_page(
             padding: 8px 12px;
         }
 
+        .section-emphasis.section-knowledge {
+            border-left-color: var(--legend-knowledge-stroke);
+        }
+
+        .section-emphasis.section-service {
+            border-left-color: var(--legend-service-stroke);
+        }
+
+        .section-emphasis.section-doc {
+            border-left-color: var(--legend-doc-stroke);
+        }
+
+        .section-emphasis.section-test {
+            border-left-color: var(--legend-test-stroke);
+        }
+
         .metadata h3 {
             margin: 8px 0;
             font-size: 1rem;
@@ -1133,7 +1153,7 @@ def information_page(
 
             {% if knowledge_items!=[] %}
                 <hr>
-                <h2 class="section-emphasis">Knowledge</h2>
+                <h2 class="section-emphasis section-knowledge">Knowledge</h2>
                 {% for knowledge in knowledge_items %}
                     {% set hasKnowledgeObject = knowledge.get("https://kgrid.org/koio#hasKnowledgeObject", [{}]) %}
                     {% set knowledgeType = knowledge.get("@type", ["Undefined"])[0]%}
@@ -1271,7 +1291,7 @@ def information_page(
 
             {% if services != [] %}
             <hr>
-            <h2 class="section-emphasis">Services</h2>
+            <h2 class="section-emphasis section-service">Services</h2>
             
             {% for service in services %}
 
@@ -1327,7 +1347,7 @@ def information_page(
         <div class="right-column">
             <div class="doc-section" id="doc-section">
             {% if documentation %}
-                <h2 class="section-emphasis">Documentation</h2>
+                <h2 class="section-emphasis section-doc">Documentation</h2>
                 <ul>
                 {% for doc in documentation %}
                     <li>
@@ -1376,7 +1396,7 @@ def information_page(
 
             <div class="test-section" id="test-section">
             {% if tests %}
-                <h2 class="section-emphasis">Tests</h2>
+                <h2 class="section-emphasis section-test">Tests</h2>
                 <ul>
                 {% for test in tests %}
                     <li>
@@ -1737,16 +1757,16 @@ def init(name: str):
 #     "/home/faridsei/dev/code/agent_experiments/template_filler1/index.html",
 #     False,
 # )
-# information_page(
-#     "C:/dev/FAIR-DO-Workshop/collection/wagner/metadata.json",
-#     "C:/dev/FAIR-DO-Workshop/collection/wagner/index.html",
-#     False
-# )
-# information_page(
-#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/metadata.json",
-#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/index.html",
-#     False
-# )
+information_page(
+    "C:/dev/FAIR-DO-Workshop/collection/wagner/metadata.json",
+    "C:/dev/FAIR-DO-Workshop/collection/wagner/index.html",
+    False
+)
+information_page(
+    "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/metadata.json",
+    "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/index.html",
+    False
+)
 # init("test")
 
 if __name__ == "__main__":
