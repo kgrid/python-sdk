@@ -187,6 +187,191 @@ def github_blob_to_scribbler(url: str, ref: str = "HEAD") -> str:
     raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{notebook_path}"
     return "https://app.scribbler.live/?" + urlencode({"jsnb": raw_url})
 
+
+def _to_text(value, default=""):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, str):
+                return item
+            if isinstance(item, dict):
+                if "@value" in item and item["@value"]:
+                    return str(item["@value"])
+                if "@id" in item and item["@id"]:
+                    return str(item["@id"])
+        return default
+    if isinstance(value, dict):
+        if "@value" in value and value["@value"]:
+            return str(value["@value"])
+        if "@id" in value and value["@id"]:
+            return str(value["@id"])
+    return default
+
+
+def _item_title(item, default="Untitled"):
+    if not isinstance(item, dict):
+        return default
+    return _to_text(item.get("http://purl.org/dc/elements/1.1/title"), default)
+
+
+def _item_ref(item, default=""):
+    if not isinstance(item, dict):
+        return default
+    return item.get("@id") or _item_title(item, default)
+
+
+def _ref_aliases(ref):
+    aliases = set()
+    if not ref:
+        return aliases
+
+    ref_str = str(ref)
+    aliases.add(ref_str)
+    cleaned = ref_str.rstrip("/")
+    if cleaned:
+        aliases.add(cleaned)
+    if "/" in cleaned:
+        aliases.add(cleaned.split("/")[-1])
+    if "#" in cleaned:
+        aliases.add(cleaned.split("#")[-1])
+    return aliases
+
+
+def build_relationship_graph(metadata, knowledge_items, services, tests, documentation):
+    nodes = {}
+    node_types = {}
+    edges = set()
+    ref_to_node = {}
+
+    def sanitize_label(label):
+        return (
+            str(label)
+            .replace("\\", "\\\\")
+            .replace('"', "'")
+            .replace("\n", " ")
+            .strip()
+        )
+
+    def add_node(node_key, label, node_type):
+        if node_key not in nodes:
+            node_id = f"N{len(nodes) + 1}"
+            nodes[node_key] = (node_id, sanitize_label(label))
+            node_types[node_id] = node_type
+        return nodes[node_key][0]
+
+    def map_ref(ref, node_id):
+        for alias in _ref_aliases(ref):
+            ref_to_node[alias] = node_id
+
+    ko_title = _item_title(metadata, "Knowledge Object")
+    ko_ref = metadata.get("@id", ko_title)
+    ko_node = add_node("ko:main", ko_title, "ko")
+    map_ref(ko_ref, ko_node)
+    map_ref(ko_title, ko_node)
+
+    for idx, knowledge in enumerate(knowledge_items):
+        fallback = knowledge.get("@id", f"Knowledge {idx + 1}").split("/")[-1]
+        label = _item_title(knowledge, fallback)
+        ref = _item_ref(knowledge, f"knowledge-{idx + 1}")
+        node_key = f"knowledge:{ref}:{idx}"
+        node_id = add_node(node_key, label, "knowledge")
+        map_ref(ref, node_id)
+        map_ref(label, node_id)
+        edges.add((ko_node, node_id, "has"))
+
+    for idx, service in enumerate(services):
+        fallback = service.get("@id", f"Service {idx + 1}").split("/")[-1]
+        label = _item_title(service, fallback)
+        ref = _item_ref(service, f"service-{idx + 1}")
+        node_key = f"service:{ref}:{idx}"
+        node_id = add_node(node_key, label, "service")
+        map_ref(ref, node_id)
+        map_ref(label, node_id)
+        edges.add((ko_node, node_id, "has"))
+
+    # Service can depend on one or more knowledge items.
+    # Add direct service -> knowledge dependency links when the metadata contains RO_0002502.
+    for service in services:
+        service_ref = _item_ref(service)
+        service_node = ref_to_node.get(str(service_ref), None)
+        if not service_node:
+            continue
+
+        depends_on = service.get("http://purl.obolibrary.org/obo/RO_0002502", [])
+        if isinstance(depends_on, dict):
+            depends_on = [depends_on]
+
+        for dep in depends_on:
+            dep_ref = None
+            if isinstance(dep, dict):
+                dep_ref = dep.get("@id") or dep.get("@value")
+            elif isinstance(dep, str):
+                dep_ref = dep
+
+            target_node = None
+            for alias in _ref_aliases(dep_ref):
+                if alias in ref_to_node:
+                    target_node = ref_to_node[alias]
+                    break
+
+            if target_node and target_node != service_node:
+                edges.add((service_node, target_node, "depends"))
+
+    for idx, test in enumerate(tests):
+        fallback = test.get("@id", f"Test {idx + 1}").split("/")[-1]
+        label = _item_title(test, fallback)
+        ref = _item_ref(test, f"test-{idx + 1}")
+        node_key = f"test:{ref}:{idx}"
+        node_id = add_node(node_key, label, "test")
+        map_ref(ref, node_id)
+        map_ref(label, node_id)
+        parent_ref = test.get("parent_ref")
+        parent_node = ref_to_node.get(str(parent_ref), ko_node)
+        edges.add((parent_node, node_id, "has"))
+
+    for idx, doc in enumerate(documentation):
+        fallback = doc.get("@id", f"Documentation {idx + 1}").split("/")[-1]
+        label = _item_title(doc, fallback)
+        ref = _item_ref(doc, f"doc-{idx + 1}")
+        node_key = f"doc:{ref}:{idx}"
+        node_id = add_node(node_key, label, "doc")
+        parent_ref = doc.get("parent_ref")
+        parent_node = ref_to_node.get(str(parent_ref), ko_node)
+        edges.add((parent_node, node_id, "has"))
+
+    graph_nodes = []
+    for node_id, label in nodes.values():
+        graph_nodes.append({
+            "id": node_id,
+            "label": label,
+            "type": node_types.get(node_id, "doc"),
+        })
+
+    graph_edges = [
+        {"source": source, "target": target, "type": edge_type}
+        for source, target, edge_type in sorted(edges)
+    ]
+
+    type_counts = {"ko": 0, "knowledge": 0, "service": 0, "test": 0, "doc": 0}
+    for node in graph_nodes:
+        node_type = node.get("type")
+        if node_type in type_counts:
+            type_counts[node_type] += 1
+
+    edge_counts = {"has": 0, "depends": 0}
+    for edge in graph_edges:
+        edge_type = edge.get("type")
+        if edge_type in edge_counts:
+            edge_counts[edge_type] += 1
+
+    return {
+        "nodes": graph_nodes,
+        "edges": graph_edges,
+        "counts": type_counts,
+        "edge_counts": edge_counts,
+    }
+
 @cli.command()
 def information_page(
     metadata_path: str = "metadata.json",
@@ -264,89 +449,577 @@ def information_page(
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{{ metadata.get("http://purl.org/dc/elements/1.1/title", [{"@value":"Metadata Page"}])[0]["@value"] }}</title>
         <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: auto;
-            display: flex;
-            width: 100%;
-        }
-        .left-column {
-            width: 70%;
-            background-color: #f0f0f0;
-            padding: 20px;
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;500;600&display=swap');
+
+        :root {
+            --bg-a: #eef2f6;
+            --bg-b: #edf1f5;
+            --ink: #132235;
+            --muted: #526274;
+            --panel: #ffffff;
+            --line: #d9e1ea;
+            --brand: #005ea8;
+            --brand-2: #0d6b5f;
+            --surface-soft: #f6f9fc;
+            --shadow: 0 2px 10px rgba(19, 34, 53, 0.06);
         }
 
-        /* Right Column */
-        .right-column {
-            width: 30%;
-            background-color: #e9e9e9;
-            padding: 20px;
+        * {
             box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            color: var(--ink);
+            background: linear-gradient(180deg, var(--bg-a) 0%, var(--bg-b) 100%);
+            font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+            line-height: 1.5;
+            padding: 32px;
+        }
+
+        h1, h2, h3 {
+            font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+            letter-spacing: 0.01em;
+            line-height: 1.2;
+        }
+
+        a {
+            color: var(--brand);
+            text-decoration-thickness: 2px;
+            text-underline-offset: 2px;
+        }
+
+        .page-hero {
+            max-width: 1400px;
+            margin: 0 auto 22px auto;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 24px 26px;
+            box-shadow: var(--shadow);
+            animation: fade-in-up 300ms ease-out both;
+        }
+
+        .page-hero h1 {
+            margin: 0 0 10px 0;
+            font-size: clamp(1.45rem, 2.2vw, 2rem);
+        }
+
+        .page-subtitle {
+            margin: 0 0 16px 0;
+            color: var(--muted);
+            font-size: 0.95rem;
+            max-width: 78ch;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(120px, 1fr));
+            gap: 12px;
+        }
+
+        .stat-pill {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: var(--surface-soft);
+            padding: 11px 14px;
+            color: #2a3b4f;
+            font-size: 0.84rem;
+            text-align: left;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        .graph-panel {
+            max-width: 1400px;
+            margin: 0 auto 22px auto;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            animation: fade-in-up 340ms ease-out both;
+        }
+
+        .graph-panel > summary {
+            cursor: pointer;
+            list-style: none;
+            display: block;
+            position: relative;
+            padding: 2px 84px 12px 2px;
+            font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+            font-weight: 700;
+            font-size: 1.02rem;
+        }
+
+        .graph-summary-title {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .graph-summary-stats {
+            margin-top: 0;
+        }
+
+        .graph-panel[open] .graph-summary-stats {
+            display: none;
+        }
+
+        .graph-panel > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .graph-panel > summary::after {
+            content: "Show";
+            color: var(--brand);
+            font-size: 0.82rem;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 4px 10px;
+            background: var(--surface-soft);
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+
+        .graph-panel[open] > summary::after {
+            content: "Hide";
+        }
+
+        .graph-panel h2 {
+            margin-top: 2px;
+            margin-bottom: 10px;
+            font-size: 1.08rem;
+            border-left: 3px solid var(--brand);
+            padding-left: 12px;
+        }
+
+        .graph-panel p {
+            margin: 0 0 14px 0;
+            color: var(--muted);
+        }
+
+        .graph-panel .mermaid {
+            background: #fcfdfe;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 14px 250px;
+            overflow-x: auto;
+        }
+
+        .graph-panel .mermaid svg {
+            font-size: 8px;
+            max-width: 58%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .graph-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 0 0 12px 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .graph-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: #ffffff;
+            padding: 6px 12px 6px 8px;
+            font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+            font-size: 0.82rem;
+            color: var(--muted);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .graph-legend-item input {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            accent-color: var(--brand);
+        }
+
+        .graph-legend-item input[data-node-type] {
+            appearance: none;
+            -webkit-appearance: none;
+            border: 1px solid var(--node-stroke, var(--brand));
+            border-radius: 5px;
+            background: var(--node-fill, #ffffff);
+            display: inline-grid;
+            place-content: center;
+        }
+
+        .graph-legend-item input[data-node-type]::before {
+            content: "";
+            width: 5px;
+            height: 10px;
+            transform: scale(0);
+            transition: transform 120ms ease-in-out;
+            border-right: 2px solid rgba(0, 0, 0, 0.55);
+            border-bottom: 2px solid rgba(0, 0, 0, 0.55);
+            transform-origin: center;
+            rotate: 45deg;
+        }
+
+        .graph-legend-item input[data-node-type]:checked::before {
+            transform: scale(1);
+        }
+
+        .graph-legend-item input[data-node-type]:focus-visible {
+            outline: 2px solid rgba(0, 94, 168, 0.35);
+            outline-offset: 1px;
+        }
+
+        .graph-legend-item input[data-node-type="ko"] { --node-fill: #fff3cd; --node-stroke: #b08900; }
+        .graph-legend-item input[data-node-type="knowledge"] { --node-fill: #ffd9b3; --node-stroke: #cc7a00; }
+        .graph-legend-item input[data-node-type="service"] { --node-fill: #cde8ff; --node-stroke: #2d6ea3; }
+        .graph-legend-item input[data-node-type="test"] { --node-fill: #d6f5df; --node-stroke: #2b8a3e; }
+        .graph-legend-item input[data-node-type="doc"] { --node-fill: #efe0ff; --node-stroke: #7a4ab3; }
+
+        .graph-legend-item input[data-edge-type] {
+            appearance: none;
+            -webkit-appearance: none;
+            border: 1px solid var(--edge-stroke, var(--brand));
+            border-radius: 5px;
+            background: #ffffff;
+            display: inline-grid;
+            place-content: center;
+        }
+
+        .graph-legend-item input[data-edge-type]::before {
+            content: "";
+            width: 5px;
+            height: 10px;
+            transform: scale(0);
+            transition: transform 120ms ease-in-out;
+            border-right: 2px solid rgba(0, 0, 0, 0.55);
+            border-bottom: 2px solid rgba(0, 0, 0, 0.55);
+            transform-origin: center;
+            rotate: 45deg;
+        }
+
+        .graph-legend-item input[data-edge-type]:checked::before {
+            transform: scale(1);
+        }
+
+        .graph-legend-item input[data-edge-type]:focus-visible {
+            outline: 2px solid rgba(0, 94, 168, 0.35);
+            outline-offset: 1px;
+        }
+
+        .graph-legend-item input[data-edge-type="has"] { --edge-stroke: #000000; }
+        .graph-legend-item input[data-edge-type="depends"] { --edge-stroke: #cc7a00; }
+
+        .graph-legend-item .count {
+            color: var(--ink);
+            font-weight: 700;
+            font-size: 0.78rem;
+            display: inline-flex;
+            align-items: center;
+            line-height: 1;
+        }
+
+        .graph-edge-legend-title {
+            margin: 10px 0 6px 0;
+            font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+            font-weight: 700;
+            font-size: 0.86rem;
+            color: var(--muted);
+        }
+
+        .legend-arrow {
+            width: 18px;
+            height: 0;
+            border-top: 3px solid #2b8a3e;
+            position: relative;
+            margin-right: 2px;
+            flex: 0 0 auto;
+        }
+
+        .legend-arrow::after {
+            content: "";
+            position: absolute;
+            right: -2px;
+            top: -5px;
+            border-left: 6px solid currentColor;
+            border-top: 4px solid transparent;
+            border-bottom: 4px solid transparent;
+            color: inherit;
+        }
+
+        .legend-arrow-has {
+            border-top-color: #000000;
+            color: #000000;
+        }
+
+        .legend-arrow-depends {
+            border-top-color: #cc7a00;
+            border-top-style: dashed;
+            color: #cc7a00;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: minmax(0, 2.2fr) minmax(320px, 1fr);
+            width: 100%;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .left-column,
+        .right-column {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 22px;
+            animation: fade-in-up 360ms ease-out both;
+        }
+
+        .metadata {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 22px;
+        }
+
+        .metadata .metadata-title {
+            margin-top: 0;
+            font-size: clamp(1.1rem, 1.6vw, 1.25rem);
+            margin-bottom: 12px;
+        }
+
+        .metadata p {
+            margin: 10px 0;
+        }
+
+        .metadata hr {
+            border: none;
+            border-top: 1px solid var(--line);
+            margin: 18px 0;
+        }
+
+        .metadata ul {
+            margin: 8px 0 16px 0;
+            padding-left: 22px;
+        }
+
+        .metadata li {
+            margin-bottom: 12px;
+        }
+
+        .metadata h2 {
+            margin-top: 24px;
+            margin-bottom: 12px;
+            font-size: 1.08rem;
+            border-left: 3px solid var(--brand);
+            padding-left: 12px;
+        }
+
+        .metadata h2.section-emphasis,
+        .doc-section h2.section-emphasis,
+        .test-section h2.section-emphasis {
+            margin-top: 26px;
+            margin-bottom: 14px;
+            font-size: 1.24rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            border-left-width: 5px;
+            background: #f6f9fc;
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+
+        .metadata h3 {
+            margin: 8px 0;
+            font-size: 1rem;
+        }
+
+        .right-column {
             display: flex;
             flex-direction: column;
             gap: 20px;
+            position: sticky;
+            top: 16px;
         }
-        h1 {
-            color: #333;
-        }
-        .metadata {
-            background-color: #f9f9f9;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .metadata p {
-            margin: 5px 0;
-        }
-        .doc-section, .test-section {
-            
-            right: 20px;
-            color: black;
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            font-size: 16px;
-        }
-        .doc-section {
-            top: 20px;
-            background-color: #97c8ed;
-        }
-        .doc-section h3 {
-            margin-top: 0;
-        }
-        .doc-section a {
-            text-decoration: underline;
-        }
-        .doc-section p {
-            margin-top: 5px;
-        }
-        
+
+        .doc-section,
         .test-section {
-            
-            background-color: #96d6b7;
+            color: var(--ink);
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            box-shadow: 0 2px 8px rgba(19, 34, 53, 0.04);
+            font-size: 0.96rem;
+            padding: 16px;
         }
+
+        .doc-section {
+            background: #fdfefe;
+        }
+
+        .test-section {
+            background: #fdfefe;
+        }
+
+        .doc-section h2,
+        .test-section h2 {
+            margin-top: 2px;
+            margin-bottom: 12px;
+            font-size: 1.04rem;
+            border-left: 3px solid var(--brand-2);
+            padding-left: 10px;
+        }
+
+        .doc-section ul,
+        .test-section ul {
+            margin: 0;
+            padding-left: 0;
+            list-style: none;
+        }
+
+        .doc-section li,
+        .test-section li {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .doc-section h3,
         .test-section h3 {
-            margin-top: 0;
+            margin: 2px 0 8px 0;
+            font-size: 0.98rem;
         }
-        
-        .test-section a {
-            text-decoration: underline;
+
+        .doc-section img,
+        .test-section img {
+            vertical-align: middle;
+            margin-right: 6px;
         }
-        
-        .test-section p {
-            margin-top: 5px;
+
+        @keyframes fade-in-up {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .right-column {
+                position: static;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 18px;
+            }
+
+            .graph-panel .mermaid svg {
+                max-width: 100%;
+            }
+
+            .stat-grid {
+                grid-template-columns: repeat(2, minmax(120px, 1fr));
+            }
         }
     </style>
     </head>
     <body>
+        <section class="page-hero">
+            <h1>{{ metadata.get("http://purl.org/dc/elements/1.1/title", [{"@value":"Knowledge Object"}])[0]["@value"] }}</h1>
+        </section>
+        <details class="graph-panel" id="relationshipGraph">
+            <summary>
+                <span class="graph-summary-title">Relationship Graph</span>
+                <div class="stat-grid graph-summary-stats">
+                    <div class="stat-pill">Knowledge: {{ knowledge_items|length }}</div>
+                    <div class="stat-pill">Services: {{ services|length }}</div>
+                    <div class="stat-pill">Documentation: {{ documentation|length }}</div>
+                    <div class="stat-pill">Tests: {{ tests|length }}</div>
+                </div>
+            </summary>
+            <p>Knowledge object as the root with connected knowledge, services, tests, and documentation based on metadata location.</p>
+            <ul class="graph-legend">
+                <li>
+                    <label class="graph-legend-item">
+                        <input type="checkbox" data-node-type="ko" checked>
+                        <span>Knowledge Object</span>
+                        <span class="count">({{ graph_counts.get("ko", 0) }})</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="graph-legend-item">
+                        <input type="checkbox" data-node-type="knowledge" checked>
+                        <span>Knowledge</span>
+                        <span class="count">({{ graph_counts.get("knowledge", 0) }})</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="graph-legend-item">
+                        <input type="checkbox" data-node-type="service" checked>
+                        <span>Service</span>
+                        <span class="count">({{ graph_counts.get("service", 0) }})</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="graph-legend-item">
+                        <input type="checkbox" data-node-type="test" checked>
+                        <span>Test</span>
+                        <span class="count">({{ graph_counts.get("test", 0) }})</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="graph-legend-item">
+                        <input type="checkbox" data-node-type="doc" checked>
+                        <span>Documentation</span>
+                        <span class="count">({{ graph_counts.get("doc", 0) }})</span>
+                    </label>
+                </li>
+            </ul>
+            <p class="graph-edge-legend-title">Relationship Arrows</p>
+            <ul class="graph-legend graph-edge-legend">
+                <li>
+                    <label class="graph-legend-item">
+                        <input type="checkbox" data-edge-type="has" checked>
+                        <span class="legend-arrow legend-arrow-has"></span>
+                        <span>has</span>
+                        <span class="count">({{ graph_edge_counts.get("has", 0) }})</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="graph-legend-item">
+                        <input type="checkbox" data-edge-type="depends">
+                        <span class="legend-arrow legend-arrow-depends"></span>
+                        <span>depends on</span>
+                        <span class="count">({{ graph_edge_counts.get("depends", 0) }})</span>
+                    </label>
+                </li>
+            </ul>
+            <div class="mermaid" id="graphMermaid"></div>
+        </details>
         <div class="container">
         <div class="left-column">
             <div class="metadata" id="metadata">
-            <h1>{{ metadata.get("http://purl.org/dc/elements/1.1/title", [{"@value":"Untitled"}])[0]["@value"] }}</h1>
+            <h2 class="metadata-title">Overview</h2>
             <p>{{ metadata.get("http://purl.org/dc/elements/1.1/description", [{"@value":"Untitled"}])[0]["@value"].replace("\n", "<br>") }}</p>
             <hr>
             <p><strong>ID:</strong> <a href="{{unexpanded_metadata.get("@id", "Undefined") if "http" in unexpanded_metadata.get("@id", "Undefined") else base_iri  }}" target='_blank'> 
@@ -386,8 +1059,22 @@ def information_page(
                     </a>
                 </p>
             {% endif %}
-            <hr>
             
+            {% set isReferencedBys = metadata.get("http://purl.org/dc/elements/1.1/isReferencedBy", [{}]) %}                  
+                        {% if isReferencedBys != [{}] %}
+                            </p><b>Is referenced by:</b></p>
+                            {% set isReferencedBys = [isReferencedBys] if isReferencedBys is mapping else isReferencedBys %}   
+                            <ul>                 
+                            {% for isReferencedBy in isReferencedBys %} 
+                                <li>     
+                                <a href="{{ isReferencedBy["@id"] }}" target='_blank'>
+                                    {{ isReferencedBy["http://purl.org/dc/elements/1.1/bibliographicCitation"][0]["@value"] }}
+                                </a>
+                                </li>
+                            {% endfor %}   
+                            </ul>
+                        {% endif %}
+            <hr>
             {% set creators = metadata.get("http://schema.org/creator", [{}]) %}
             {% if creators != [{}] %}
                 <h2>Creator</h2>
@@ -420,7 +1107,7 @@ def information_page(
                 </ul>
             {% endif %}
             {% if metadata.get("http://schema.org/contributor") %}
-                <h2>Contributor</h2>
+                <h2 class="section-emphasis">Contributor</h2>
                 <p><strong>Name:</strong> {{ metadata.get("http://schema.org/contributor",  [{}])[0].get("http://schema.org/givenName", [{"@value":""}])[0]["@value"] }}
                     {{ metadata.get("http://schema.org/contributor", [{}])[0].get("http://schema.org/familyName",[{"@value":""}])[0]["@value"] }} {{ metadata.get("http://schema.org/contributor", [{}])[0].get("http://schema.org/name", [{"@value":""}])[0]["@value"] }}</p>
                 <p><strong>Affiliation:</strong> {{ metadata.get("http://schema.org/contributor", [{}])[0].get("http://schema.org/affiliation", [{"@value":"Undefined"}])[0]["@value"] }}</p>
@@ -437,29 +1124,16 @@ def information_page(
             {% endif %}
             
             {% if metadata.get("http://purl.org/dc/elements/1.1/publisher") %}
-                <p><h2>Publisher</h2> 
+                <h2 class="section-emphasis">Publisher</h2>
+                <p>
                     {{ metadata.get("http://purl.org/dc/elements/1.1/publisher", [{"@value":"Undefined"}])[0]["@value"] }}
                 </p>
-            {% endif %}
+            {% endif %}           
             
-            {% set isReferencedBys = metadata.get("http://purl.org/dc/elements/1.1/isReferencedBy", [{}]) %}                  
-            {% if isReferencedBys != [{}] %}
-                </p><b>Is referenced by:</b></p>
-                {% set isReferencedBys = [isReferencedBys] if isReferencedBys is mapping else isReferencedBys %}   
-                <ul>                 
-                {% for isReferencedBy in isReferencedBys %} 
-                    <li>     
-                    <a href="{{ isReferencedBy["@id"] }}" target='_blank'>
-                        {{ isReferencedBy["http://purl.org/dc/elements/1.1/bibliographicCitation"][0]["@value"] }}
-                    </a>
-                    </li>
-                {% endfor %}   
-                </ul>
-            {% endif %}
 
             {% if knowledge_items!=[] %}
                 <hr>
-                <h2>Knowledge</h2>
+                <h2 class="section-emphasis">Knowledge</h2>
                 {% for knowledge in knowledge_items %}
                     {% set hasKnowledgeObject = knowledge.get("https://kgrid.org/koio#hasKnowledgeObject", [{}]) %}
                     {% set knowledgeType = knowledge.get("@type", ["Undefined"])[0]%}
@@ -597,7 +1271,7 @@ def information_page(
 
             {% if services != [] %}
             <hr>
-            <h2>Services</h2>
+            <h2 class="section-emphasis">Services</h2>
             
             {% for service in services %}
 
@@ -620,7 +1294,7 @@ def information_page(
                 {% if service.get("http://www.ebi.ac.uk/swo/SWO_0004001") %}
                         <p><strong>Has interface:</strong> 
                             <a href="{{ service.get("http://www.ebi.ac.uk/swo/SWO_0004001", [{"@id":"Undefined"}])[0]["@id"] }}" target='_blank'>
-                                {{ service.get("http://www.ebi.ac.uk/swo/SWO_0004001", [{"@value":"Undefined"}])[0]["@id"] }}
+                                {{ service.get("http://www.ebi.ac.uk/swo/SWO_0004001", [{"@value":"Undefined"}])[0]["@id"] | filename }}
                             </a>
                         </p>
                 {% endif %} 
@@ -653,7 +1327,7 @@ def information_page(
         <div class="right-column">
             <div class="doc-section" id="doc-section">
             {% if documentation %}
-                <h2>Documentation</h2>
+                <h2 class="section-emphasis">Documentation</h2>
                 <ul>
                 {% for doc in documentation %}
                     <li>
@@ -675,7 +1349,7 @@ def information_page(
                                 </a>
                             {% endif %}
                             {% if "Scribbler Notebook" in imp_type %}
-                                <a href="{{ doc.get('@id', '') | scribbler_url }}" target="_blank" rel="noopener noreferrer"> <img src="https://img.shields.io/badge/Open%20In-Scribbler-2F9E44?logo=javascript&logoColor=white" alt=Open In Scribbler"> </a>
+                                <a href="{{ doc.get('@id', '') | scribbler_url }}" target="_blank" rel="noopener noreferrer"> <img src="https://img.shields.io/badge/Open%20In-Scribbler-2F9E44?logo=javascript&logoColor=white" alt="Open In Scribbler"> </a>
                             {% endif %}
                         {% endfor %}
 
@@ -702,7 +1376,7 @@ def information_page(
 
             <div class="test-section" id="test-section">
             {% if tests %}
-                <h2>Tests</h2>
+                <h2 class="section-emphasis">Tests</h2>
                 <ul>
                 {% for test in tests %}
                     <li>
@@ -727,6 +1401,106 @@ def information_page(
             </div>
         </div>
         </div>
+        <script type="module">
+            import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+            const graphData = {{ graph_data_json | safe }};
+            const graphPanel = document.getElementById("relationshipGraph");
+            const graphTarget = document.getElementById("graphMermaid");
+            const legendCheckboxes = document.querySelectorAll(".graph-legend input[type='checkbox']");
+            const nodeTypeCheckboxes = document.querySelectorAll(".graph-legend input[data-node-type]");
+            const edgeTypeCheckboxes = document.querySelectorAll(".graph-edge-legend input[data-edge-type]");
+
+            const classDefs = [
+                "classDef ko fill:#fff3cd,stroke:#b08900,stroke-width:2px,color:#4a3a00,font-weight:bold;",
+                "classDef knowledge fill:#ffd9b3,stroke:#cc7a00,stroke-width:1.5px,color:#3b2200;",
+                "classDef service fill:#cde8ff,stroke:#2d6ea3,stroke-width:1.5px,color:#0f2f4a;",
+                "classDef test fill:#d6f5df,stroke:#2b8a3e,stroke-width:1.5px,color:#13361d;",
+                "classDef doc fill:#efe0ff,stroke:#7a4ab3,stroke-width:1.5px,color:#301943;",
+                "classDef empty fill:#f4f4f4,stroke:#9aa7b5,stroke-width:1px,color:#3b4b5a;"
+            ];
+
+            function buildGraphDefinition() {
+                const activeTypes = new Set(
+                    Array.from(nodeTypeCheckboxes)
+                        .filter((box) => box.checked)
+                        .map((box) => box.getAttribute("data-node-type"))
+                );
+
+                const activeEdgeTypes = new Set(
+                    Array.from(edgeTypeCheckboxes)
+                        .filter((box) => box.checked)
+                        .map((box) => box.getAttribute("data-edge-type"))
+                );
+
+                const visibleNodes = graphData.nodes.filter((node) => activeTypes.has(node.type));
+                const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
+                const visibleEdges = graphData.edges.filter(
+                    (edge) =>
+                        visibleNodeIds.has(edge.source) &&
+                        visibleNodeIds.has(edge.target) &&
+                        activeEdgeTypes.has(edge.type)
+                );
+
+                const lines = ["graph LR", ...classDefs];
+
+                if (visibleNodes.length === 0) {
+                    lines.push('EMPTY["No node types selected"]');
+                    lines.push("class EMPTY empty;");
+                    return lines.join("\\n");
+                }
+
+                for (const node of visibleNodes) {
+                    lines.push(`${node.id}["${node.label}"]`);
+                }
+
+                for (const edge of visibleEdges) {
+                    lines.push(`${edge.source} --> ${edge.target}`);
+                }
+
+                visibleEdges.forEach((edge, index) => {
+                    if (edge.type === "depends") {
+                        lines.push(`linkStyle ${index} stroke:#cc7a00,stroke-width:2.2px,stroke-dasharray: 6 4;`);
+                    } else {
+                        lines.push(`linkStyle ${index} stroke:#000000,stroke-width:2.2px;`);
+                    }
+                });
+
+                for (const node of visibleNodes) {
+                    lines.push(`class ${node.id} ${node.type};`);
+                }
+
+                return lines.join("\\n");
+            }
+
+            async function renderRelationshipGraph() {
+                if (!graphPanel.open) {
+                    return;
+                }
+
+                const definition = buildGraphDefinition();
+                const renderId = `relationship-graph-${Date.now()}`;
+                const { svg } = await mermaid.render(renderId, definition);
+                graphTarget.innerHTML = svg;
+            }
+
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: "neutral",
+                securityLevel: "loose",
+                flowchart: { curve: "catmullRom", nodeSpacing: 10, rankSpacing: 100, padding: 5 }
+            });
+
+            graphPanel.addEventListener("toggle", () => {
+                if (graphPanel.open) {
+                    renderRelationshipGraph();
+                }
+            });
+
+            for (const box of legendCheckboxes) {
+                box.addEventListener("change", renderRelationshipGraph);
+            }
+        </script>
     </body>
     </html>
     """)
@@ -736,6 +1510,10 @@ def information_page(
     tests = find_item(metadata, "https://kgrid.org/koio#hasTest", [],metadata.get("http://purl.org/dc/elements/1.1/title", ""), metadata.get("@type", {"@value":[]})[0].split('/')[-1])
     knowledge_items = metadata.get("https://kgrid.org/koio#hasKnowledge", [])
     services = metadata.get("https://kgrid.org/koio#hasService", [])
+    graph_data = build_relationship_graph(
+        metadata, knowledge_items, services, tests, documentation
+    )
+    graph_data_json = json.dumps(graph_data)
     # Render the template
     html = template.render(
         metadata=metadata,
@@ -746,6 +1524,9 @@ def information_page(
         knowledge_items=knowledge_items,
         services=services,
         base_iri=os.path.dirname(base_iri),
+        graph_data_json=graph_data_json,
+        graph_counts=graph_data.get("counts", {}),
+        graph_edge_counts=graph_data.get("edge_counts", {}),
     )
     with open(output, "w") as f:
         f.write(html)
@@ -757,7 +1538,7 @@ def expand_metadata(data, base_context):
     return jsonld.expand(data, base_context)[0]  # Return as-is if not a dict or list
 
 
-def find_item(obj, key, results: list, title, obj_type):
+def find_item(obj, key, results: list, title, obj_type, parent_ref=None):
     """Recursively find all items with the given key in a nested dictionary."""
 
     if isinstance(obj, dict):
@@ -767,19 +1548,41 @@ def find_item(obj, key, results: list, title, obj_type):
                     for item in v:
                         item["item_of"] = title
                         item["type"] = obj_type
+                        item["parent_ref"] = parent_ref
                         results.append(item)
                 else:
                     v["item_of"] = title
                     v["type"] = obj_type
+                    v["parent_ref"] = parent_ref
                     results.append(v)
             elif isinstance(v, (dict, list)):
                 obj_type = get_object_types(obj)
-                results = find_item(v, key, results, obj.get("http://purl.org/dc/elements/1.1/title", [{"@value": obj.get("@id", "").split('/')[-1]}]), obj_type)
+                next_parent_ref = obj.get(
+                    "@id",
+                    _to_text(
+                        obj.get(
+                            "http://purl.org/dc/elements/1.1/title",
+                            [{"@value": obj.get("@id", "").split('/')[-1]}],
+                        ),
+                        obj.get("@id", ""),
+                    ),
+                )
+                results = find_item(v, key, results, obj.get("http://purl.org/dc/elements/1.1/title", [{"@value": obj.get("@id", "").split('/')[-1]}]), obj_type, next_parent_ref)
     elif isinstance(obj, list):
         for item in obj:
             if not isinstance(item, str):
                 obj_type = get_object_types(item)
-                results = find_item(item, key, results, item.get("http://purl.org/dc/elements/1.1/title", [{"@value": item.get("@id", "").split('/')[-1]}]),  obj_type)
+                next_parent_ref = item.get(
+                    "@id",
+                    _to_text(
+                        item.get(
+                            "http://purl.org/dc/elements/1.1/title",
+                            [{"@value": item.get("@id", "").split('/')[-1]}],
+                        ),
+                        item.get("@id", ""),
+                    ),
+                )
+                results = find_item(item, key, results, item.get("http://purl.org/dc/elements/1.1/title", [{"@value": item.get("@id", "").split('/')[-1]}]),  obj_type, next_parent_ref)
     return results
 
 def get_object_types(obj):
@@ -934,11 +1737,16 @@ def init(name: str):
 #     "/home/faridsei/dev/code/agent_experiments/template_filler1/index.html",
 #     False,
 # )
-information_page(
-    "C:/dev/FAIR-DO-Workshop/collection/wagner/metadata.json",
-    "C:/dev/FAIR-DO-Workshop/collection/wagner/index.html",
-    False
-)
+# information_page(
+#     "C:/dev/FAIR-DO-Workshop/collection/wagner/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/collection/wagner/index.html",
+#     False
+# )
+# information_page(
+#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/index.html",
+#     False
+# )
 # init("test")
 
 if __name__ == "__main__":
