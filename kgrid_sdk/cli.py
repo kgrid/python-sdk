@@ -5,7 +5,8 @@ import tarfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse, urlencode
+
 
 import git
 import requests
@@ -142,12 +143,55 @@ def get_filename(url):
         return os.path.basename(parsed_url.path)
     return "undefined"
 
+def github_blob_to_binder(url: str, kernel_name: str = "javascript", ref: str = "HEAD") -> str:
+    """
+    Convert:
+    https://github.com/{owner}/{repo}/blob/{branch}/{path}
+    ->
+    https://mybinder.org/v2/gh/{owner}/{repo}/{ref}?urlpath=lab/tree/{path}%3Fkernel_name%3D...
+    """
+    if not url:
+        return "#"
+
+    parsed = urlparse(url)
+    if parsed.netloc != "github.com":
+        return "#"
+
+    parts = parsed.path.strip("/").split("/")
+    # expected: owner repo blob branch ...path
+    if len(parts) < 5 or parts[2] != "blob":
+        return "#"
+
+    owner, repo = parts[0], parts[1]
+    notebook_path = "/".join(parts[4:])  # skip owner/repo/blob/branch
+    urlpath = quote(f"lab/tree/{notebook_path}?kernel_name={kernel_name}", safe="/")
+
+    return f"https://mybinder.org/v2/gh/{owner}/{repo}/{ref}?urlpath={urlpath}"
+
+def github_blob_to_scribbler(url: str, ref: str = "HEAD") -> str:
+    if not url:
+        return "#"
+
+    parsed = urlparse(url)
+    if parsed.netloc != "github.com":
+        return "#"
+
+    parts = parsed.path.strip("/").split("/")
+    # expected: owner/repo/blob/branch/path...
+    if len(parts) < 5 or parts[2] != "blob":
+        return "#"
+
+    owner, repo = parts[0], parts[1]
+    notebook_path = "/".join(parts[4:])
+
+    raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{notebook_path}"
+    return "https://app.scribbler.live/?" + urlencode({"jsnb": raw_url})
 
 @cli.command()
 def information_page(
     metadata_path: str = "metadata.json",
     output: str = "index.html",
-    include_relative_paths: bool = False,
+    include_relative_paths: bool = False
 ):
     """
     creates knowledge object information page using metadata
@@ -197,6 +241,7 @@ def information_page(
     base_iri = get_github_branch_url(metadata_path)
 
 
+
     if not base_iri or include_relative_paths:
         base_iri = "./"
     if not isinstance(context["@context"], list):
@@ -207,6 +252,9 @@ def information_page(
 
     env = Environment()
     env.filters["filename"] = get_filename
+    env.filters["binder_url"] = github_blob_to_binder
+    env.filters["scribbler_url"] = github_blob_to_scribbler
+
     # Jinja2 template
     template = env.from_string("""
     <!DOCTYPE html>
@@ -516,7 +564,7 @@ def information_page(
                                 {{ implementation.get("http://purl.org/dc/elements/1.1/title") if implementation.get("http://purl.org/dc/elements/1.1/title") else implementation.get("@id", "Undefined") | filename}}
                             </a><br/>(type: 
                                 {% set imp_types = implementation.get("@type", "Undefined")%}
-                                {% for imp_type in imp_types %}<a href="{{ imp_type }}" target='_blank'>{{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").split("/")[-1]}}</a>{% if not loop.last %}, {% endif %}{% endfor %})
+                                {% for imp_type in imp_types %}<a href="{{ imp_type }}" target='_blank'>{{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").replace("http://www.ebi.ac.uk/swo/SWO_0000108","JavaScript").split("/")[-1].split("#")[-1]}}</a>{% if not loop.last %}, {% endif %}{% endfor %})
                             </li>
                         {% endfor %}
                         </ul>
@@ -590,7 +638,9 @@ def information_page(
                                 <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank'>
                                     {{ implementation.get("@id", "Undefined") | filename}}
                                 </a>                                 
-                            {% endif %}   
+                            {% endif %}  <br/>(type: 
+                                {% set imp_types = implementation.get("@type", "Undefined")%}
+                                {% for imp_type in imp_types %}<a href="{{ imp_type }}" target='_blank'>{{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").replace("http://www.ebi.ac.uk/swo/SWO_0000108","JavaScript").split("/")[-1].split("#")[-1]}}</a>{% if not loop.last %}, {% endif %}{% endfor %}) 
                             </li>
                         {% endfor %}      
                         </ul>            
@@ -607,16 +657,38 @@ def information_page(
                 <ul>
                 {% for doc in documentation %}
                     <li>
-                        <h3><a href="{{ doc.get('@id', '#') }}" target='_blank'>{{ doc.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a></h3>
+                        {% set imp_types = doc.get('@type', '#')%}
+                        {% if imp_types is string %}
+                            {% set imp_types = [imp_types] %}
+                        {% endif %}
+                        <h3>
+                        <a href="{{ doc.get('@id', '#') }}" target='_blank'>{{ doc.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a>
+                        <br/>
+                        {% for imp_type in imp_types %}
+                            {% if "Google Colab Notebook" in imp_type %}
+                                <a href="https://colab.research.google.com/github/{{doc.get('@id', '#').replace("https://github.com/","") }}" target="_blank" rel="noopener noreferrer"> <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"> </a>
+                            {% endif %}
+                            {% if "Binder Notebook" in imp_type %}
+                                <a href="{{ doc.get('@id', '') | binder_url('javascript') }}"
+                                    target="_blank" rel="noopener noreferrer">
+                                    <img src="https://mybinder.org/badge_logo.svg" alt="Binder">
+                                </a>
+                            {% endif %}
+                            {% if "Scribbler Notebook" in imp_type %}
+                                <a href="{{ doc.get('@id', '') | scribbler_url }}" target="_blank" rel="noopener noreferrer"> <img src="https://img.shields.io/badge/Open%20In-Scribbler-2F9E44?logo=javascript&logoColor=white" alt=Open In Scribbler"> </a>
+                            {% endif %}
+                        {% endfor %}
+
+                        </h3>
                         <p>{{ doc.get('http://purl.org/dc/elements/1.1/description', [{"@value":"No description"}])[0]["@value"] }}</p>
                         {% if doc.get("item_of","")!="" %}
                             <p><strong>Document of:</strong> {{doc.get("item_of","")[0]["@value"]}} ({{ doc.get("type","") }}) </p>
                         {% endif %}
                         <p><strong>Type:</strong> 
-                        {% set imp_types = doc.get('@type', '#')%}
+                        
                         {% for imp_type in imp_types %}  
                                 <a href="{{ imp_type }}" target='_blank'>
-                                    {{ imp_type.replace("https://kgrid.org/koio#","").split("/")[-1]}}
+                                    {{ imp_type.replace("https://kgrid.org/koio#","").split("/")[-1].split("#")[-1]}}
                                 </a>{% if not loop.last %}, {% endif %}
                         {% endfor %}
                         <br/><br/>
@@ -643,7 +715,7 @@ def information_page(
                         {% set imp_types = test.get('http://www.ebi.ac.uk/swo/SWO_0000085', [{}])[0].get('@type', '#')%}
                         {% for imp_type in imp_types %}  
                                 <a href="{{ imp_type }}" target='_blank'>
-                                    {{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").split("/")[-1]}}
+                                    {{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").replace("http://www.ebi.ac.uk/swo/SWO_0000108","JavaScript").split("/")[-1].split("#")[-1]}}
                                 </a>{% if not loop.last %}, {% endif %}
                         {% endfor %}
                     </li>
@@ -746,7 +818,8 @@ def get_github_branch_url(file_path):
                 )
 
             # Construct the full URL to the current branch
-            branch_url = f"{origin_url}/blob/{branch}/{relative_path}"
+            normalized_relative_path = relative_path.replace("\\", "/")
+            branch_url = f"{origin_url}/blob/{branch}/{normalized_relative_path}"
             return branch_url
         else:
             return None
@@ -861,6 +934,11 @@ def init(name: str):
 #     "/home/faridsei/dev/code/agent_experiments/template_filler1/index.html",
 #     False,
 # )
+information_page(
+    "C:/dev/FAIR-DO-Workshop/collection/wagner/metadata.json",
+    "C:/dev/FAIR-DO-Workshop/collection/wagner/index.html",
+    False
+)
 # init("test")
 
 if __name__ == "__main__":
