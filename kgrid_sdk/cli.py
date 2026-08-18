@@ -3,9 +3,10 @@ import json
 import os
 import tarfile
 from datetime import datetime
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Optional
-from urllib.parse import quote, urlparse, urlencode, urljoin
+from urllib.parse import quote, unquote, urlparse, urlencode, urljoin
 
 
 import git
@@ -15,6 +16,89 @@ from jinja2 import Environment
 from pyld import jsonld
 
 cli = typer.Typer()
+
+
+class _LinkExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            href = dict(attrs).get("href")
+            if href:
+                self.links.append(href)
+
+
+def _github_file_url(url):
+    parsed = urlparse(url)
+    if parsed.netloc == "raw.githubusercontent.com":
+        return url
+    if parsed.netloc != "github.com":
+        return None
+
+    parts = parsed.path.strip("/").split("/")
+    if len(parts) < 5 or parts[2] != "blob":
+        return None
+    return f"https://raw.githubusercontent.com/{parts[0]}/{parts[1]}/{parts[3]}/{'/'.join(parts[4:])}"
+
+
+def validate_information_page_links(html, output_path, request_get=requests.get):
+    """Validate local file links and GitHub blob links from rendered page HTML."""
+    parser = _LinkExtractor()
+    parser.feed(html)
+
+    checked_links = []
+    output_dir = Path(output_path).resolve().parent
+    for href in dict.fromkeys(parser.links):
+        parsed = urlparse(href)
+        github_file_url = _github_file_url(href)
+        if github_file_url:
+            try:
+                response = request_get(github_file_url, timeout=10, stream=True)
+                is_valid = response.status_code == 200
+                detail = f"HTTP {response.status_code}"
+            except requests.RequestException as error:
+                is_valid = False
+                detail = str(error)
+            checked_links.append({
+                "link": href,
+                "kind": "github",
+                "valid": is_valid,
+                "detail": detail,
+            })
+        elif not parsed.scheme and not href.startswith("#"):
+            target_path = (output_dir / unquote(parsed.path)).resolve()
+            is_valid = target_path.is_file()
+            checked_links.append({
+                "link": href,
+                "kind": "local",
+                "valid": is_valid,
+                "detail": str(target_path),
+            })
+
+    defective_links = [link for link in checked_links if not link["valid"]]
+    return {
+        "summary": {
+            "checked": len(checked_links),
+            "valid": len(checked_links) - len(defective_links),
+            "defective": len(defective_links),
+        },
+        "defective_links": defective_links,
+    }
+
+
+def print_link_validation_report(html, output_path):
+    report = validate_information_page_links(html, output_path)
+    summary = report["summary"]
+    print(
+        "- Link validation: "
+        f"{summary['checked']} checked, {summary['valid']} valid, "
+        f"{summary['defective']} defective"
+    )
+    for link in report["defective_links"]:
+        print(f"  - {link['kind']}: {link['link']} ({link['detail']})")
+    return report
 
 
 @cli.callback(invoke_without_command=True, no_args_is_help=True)
@@ -1725,6 +1809,7 @@ def information_page(
         f.write(html)
 
     print(f"\033[32m- Knowledge object information page created\033[0m at {output}")
+    print_link_validation_report(html, output)
 
 
 def expand_metadata(data, base_context):
@@ -1930,26 +2015,26 @@ def init(name: str):
 #     "/home/faridsei/dev/code/agent_experiments/template_filler1/index.html",
 #     False,
 # )
-information_page(
-    "C:/dev/FAIR-DO-Workshop/collection/wagner/metadata.json",
-    "C:/dev/FAIR-DO-Workshop/collection/wagner/index.html",
-    False
-)
-information_page(
-    "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/metadata.json",
-    "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/index.html",
-    False
-)
-information_page(
-    "C:/dev/FAIR-DO-Workshop/collection/dfu-hbot-bounded-regimen-and-execution-burden/metadata.json",
-    "C:/dev/FAIR-DO-Workshop/collection/dfu-hbot-bounded-regimen-and-execution-burden/index.html",
-    False
-)
-information_page(
-    "C:/dev/FAIR-DO-Workshop/collection/margolis-dfu-prognostic/metadata.json",
-    "C:/dev/FAIR-DO-Workshop/collection/margolis-dfu-prognostic/index.html",
-    False
-)
+# information_page(
+#     "C:/dev/FAIR-DO-Workshop/collection/wagner/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/collection/wagner/index.html",
+#     False
+# )
+# information_page(
+#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/index.html",
+#     False
+# )
+# information_page(
+#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbot-bounded-regimen-and-execution-burden/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbot-bounded-regimen-and-execution-burden/index.html",
+#     False
+# )
+# information_page(
+#     "C:/dev/FAIR-DO-Workshop/collection/margolis-dfu-prognostic/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/collection/margolis-dfu-prognostic/index.html",
+#     False
+# )
 
 # init("test")
 
