@@ -5,7 +5,7 @@ import tarfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from urllib.parse import quote, urlparse, urlencode
+from urllib.parse import quote, urlparse, urlencode, urljoin
 
 
 import git
@@ -238,9 +238,11 @@ def _ref_aliases(ref):
     return aliases
 
 
-def build_relationship_graph(metadata, knowledge_items, services, tests, documentation):
+def build_relationship_graph(metadata, knowledge_items, services, tests, documentation, base_iri="."):
     nodes = {}
     node_types = {}
+    node_full_labels = {}
+    node_links = {}
     edges = set()
     ref_to_node = {}
 
@@ -253,20 +255,53 @@ def build_relationship_graph(metadata, knowledge_items, services, tests, documen
             .strip()
         )
 
+    def compact_label(label, max_chars=34):
+        clean = " ".join(str(label).split())
+        if len(clean) <= max_chars:
+            return clean
+        return clean[: max_chars - 3].rstrip() + "..."
+
     def add_node(node_key, label, node_type):
         if node_key not in nodes:
             node_id = f"N{len(nodes) + 1}"
-            nodes[node_key] = (node_id, sanitize_label(label))
+            clean_label = sanitize_label(" ".join(str(label).split()))
+            nodes[node_key] = (node_id, sanitize_label(compact_label(clean_label)))
             node_types[node_id] = node_type
+            node_full_labels[node_id] = clean_label
         return nodes[node_key][0]
+
+    def resolve_link(ref):
+        if not ref:
+            return None
+        ref_str = str(ref).strip()
+        if not ref_str or ref_str.startswith("_:"):
+            return None
+        if ref_str.startswith(("http://", "https://", "mailto:")):
+            return ref_str
+        if ref_str.startswith(("#", "/", "./", "../")):
+            return ref_str
+        return urljoin(f"{base_iri.rstrip('/')}/", ref_str)
 
     def map_ref(ref, node_id):
         for alias in _ref_aliases(ref):
             ref_to_node[alias] = node_id
 
+    def first_artifact_link(item):
+        implemented_by = item.get("http://www.ebi.ac.uk/swo/SWO_0000085", [])
+        if isinstance(implemented_by, dict):
+            implemented_by = [implemented_by]
+
+        for implementation in implemented_by:
+            if isinstance(implementation, dict):
+                artifact_ref = implementation.get("@id") or implementation.get("@value")
+                if artifact_ref:
+                    return resolve_link(artifact_ref)
+        return None
+
     ko_title = _item_title(metadata, "Knowledge Object")
     ko_ref = metadata.get("@id", ko_title)
     ko_node = add_node("ko:main", ko_title, "ko")
+    node_links[ko_node] = resolve_link(ko_ref)
     map_ref(ko_ref, ko_node)
     map_ref(ko_title, ko_node)
 
@@ -276,6 +311,7 @@ def build_relationship_graph(metadata, knowledge_items, services, tests, documen
         ref = _item_ref(knowledge, f"knowledge-{idx + 1}")
         node_key = f"knowledge:{ref}:{idx}"
         node_id = add_node(node_key, label, "knowledge")
+        node_links[node_id] = first_artifact_link(knowledge)
         map_ref(ref, node_id)
         map_ref(label, node_id)
         edges.add((ko_node, node_id, "has"))
@@ -286,6 +322,7 @@ def build_relationship_graph(metadata, knowledge_items, services, tests, documen
         ref = _item_ref(service, f"service-{idx + 1}")
         node_key = f"service:{ref}:{idx}"
         node_id = add_node(node_key, label, "service")
+        node_links[node_id] = first_artifact_link(service)
         map_ref(ref, node_id)
         map_ref(label, node_id)
         edges.add((ko_node, node_id, "has"))
@@ -324,6 +361,7 @@ def build_relationship_graph(metadata, knowledge_items, services, tests, documen
         ref = _item_ref(test, f"test-{idx + 1}")
         node_key = f"test:{ref}:{idx}"
         node_id = add_node(node_key, label, "test")
+        node_links[node_id] = first_artifact_link(test)
         map_ref(ref, node_id)
         map_ref(label, node_id)
         parent_ref = test.get("parent_ref")
@@ -336,6 +374,7 @@ def build_relationship_graph(metadata, knowledge_items, services, tests, documen
         ref = _item_ref(doc, f"doc-{idx + 1}")
         node_key = f"doc:{ref}:{idx}"
         node_id = add_node(node_key, label, "doc")
+        node_links[node_id] = resolve_link(ref)
         parent_ref = doc.get("parent_ref")
         parent_node = ref_to_node.get(str(parent_ref), ko_node)
         edges.add((parent_node, node_id, "has"))
@@ -345,7 +384,9 @@ def build_relationship_graph(metadata, knowledge_items, services, tests, documen
         graph_nodes.append({
             "id": node_id,
             "label": label,
+            "full_label": node_full_labels.get(node_id, label),
             "type": node_types.get(node_id, "doc"),
+            "link": node_links.get(node_id),
         })
 
     graph_edges = [
@@ -607,13 +648,15 @@ def information_page(
             background: #fcfdfe;
             border: 1px solid var(--line);
             border-radius: 10px;
-            padding: 14px 250px;
-            overflow-x: auto;
+            padding: 12px 12px 18px 12px;
+            max-height: 300px;
+            overflow: hidden;
         }
 
         .graph-panel .mermaid svg {
             font-size: 8px;
-            max-width: 58%;
+            max-width: 100%;
+            width: auto;
             height: auto;
             display: block;
             margin: 0 auto;
@@ -626,6 +669,51 @@ def information_page(
             margin: 0 0 12px 0;
             padding: 0;
             list-style: none;
+        }
+
+        .graph-node-legend {
+            flex-wrap: nowrap;
+            gap: 6px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 2px;
+        }
+
+        .graph-node-legend .graph-legend-item {
+            padding: 5px 9px 5px 7px;
+            font-size: 0.78rem;
+        }
+
+        .graph-node-legend .count {
+            font-size: 0.74rem;
+        }
+
+        .graph-legend-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .graph-legend-group {
+            flex: 1 1 360px;
+            min-width: 280px;
+        }
+
+        .graph-legend-group-title {
+            margin: 0;
+            font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+            font-weight: 700;
+            font-size: 0.86rem;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .graph-legend-inline-title {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 2px;
         }
 
         .graph-legend-item {
@@ -728,14 +816,6 @@ def information_page(
             display: inline-flex;
             align-items: center;
             line-height: 1;
-        }
-
-        .graph-edge-legend-title {
-            margin: 10px 0 6px 0;
-            font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-            font-weight: 700;
-            font-size: 0.86rem;
-            color: var(--muted);
         }
 
         .legend-arrow {
@@ -967,73 +1047,76 @@ def information_page(
         <section class="page-hero">
             <h1>{{ metadata.get("http://purl.org/dc/elements/1.1/title", [{"@value":"Knowledge Object"}])[0]["@value"] }}</h1>
         </section>
-        <details class="graph-panel" id="relationshipGraph">
+        <details class="graph-panel" id="relationshipGraph" open>
             <summary>
                 <span class="graph-summary-title">Relationship Graph</span>
                 <div class="stat-grid graph-summary-stats">
-                    <div class="stat-pill">Knowledge: {{ knowledge_items|length }}</div>
+                    <div class="stat-pill">Computable Knowledge: {{ knowledge_items|length }}</div>
                     <div class="stat-pill">Services: {{ services|length }}</div>
                     <div class="stat-pill">Documentation: {{ documentation|length }}</div>
                     <div class="stat-pill">Tests: {{ tests|length }}</div>
                 </div>
             </summary>
-            <p>Knowledge object as the root with connected knowledge, services, tests, and documentation based on metadata location.</p>
-            <ul class="graph-legend">
-                <li>
-                    <label class="graph-legend-item">
-                        <input type="checkbox" data-node-type="ko" checked>
-                        <span>Knowledge Object</span>
-                        <span class="count">({{ graph_counts.get("ko", 0) }})</span>
-                    </label>
-                </li>
-                <li>
-                    <label class="graph-legend-item">
-                        <input type="checkbox" data-node-type="knowledge" checked>
-                        <span>Knowledge</span>
-                        <span class="count">({{ graph_counts.get("knowledge", 0) }})</span>
-                    </label>
-                </li>
-                <li>
-                    <label class="graph-legend-item">
-                        <input type="checkbox" data-node-type="service" checked>
-                        <span>Service</span>
-                        <span class="count">({{ graph_counts.get("service", 0) }})</span>
-                    </label>
-                </li>
-                <li>
-                    <label class="graph-legend-item">
-                        <input type="checkbox" data-node-type="test" checked>
-                        <span>Test</span>
-                        <span class="count">({{ graph_counts.get("test", 0) }})</span>
-                    </label>
-                </li>
-                <li>
-                    <label class="graph-legend-item">
-                        <input type="checkbox" data-node-type="doc" checked>
-                        <span>Documentation</span>
-                        <span class="count">({{ graph_counts.get("doc", 0) }})</span>
-                    </label>
-                </li>
-            </ul>
-            <p class="graph-edge-legend-title">Relationship Arrows</p>
-            <ul class="graph-legend graph-edge-legend">
-                <li>
-                    <label class="graph-legend-item">
-                        <input type="checkbox" data-edge-type="has" checked>
-                        <span class="legend-arrow legend-arrow-has"></span>
-                        <span>has</span>
-                        <span class="count">({{ graph_edge_counts.get("has", 0) }})</span>
-                    </label>
-                </li>
-                <li>
-                    <label class="graph-legend-item">
-                        <input type="checkbox" data-edge-type="depends">
-                        <span class="legend-arrow legend-arrow-depends"></span>
-                        <span>depends on</span>
-                        <span class="count">({{ graph_edge_counts.get("depends", 0) }})</span>
-                    </label>
-                </li>
-            </ul>
+            <div class="graph-legend-layout">
+                <div class="graph-legend-group">
+                    <ul class="graph-legend graph-node-legend">
+                        <li class="graph-legend-inline-title">
+                            <span class="graph-legend-group-title">Nodes:</span>
+                        </li>
+                        <li>
+                            <label class="graph-legend-item">
+                                <input type="checkbox" data-node-type="knowledge" checked>
+                                <span>Computable Knowledge</span>
+                                <span class="count">({{ graph_counts.get("knowledge", 0) }})</span>
+                            </label>
+                        </li>
+                        <li>
+                            <label class="graph-legend-item">
+                                <input type="checkbox" data-node-type="service" checked>
+                                <span>Service</span>
+                                <span class="count">({{ graph_counts.get("service", 0) }})</span>
+                            </label>
+                        </li>
+                        <li>
+                            <label class="graph-legend-item">
+                                <input type="checkbox" data-node-type="test" checked>
+                                <span>Test</span>
+                                <span class="count">({{ graph_counts.get("test", 0) }})</span>
+                            </label>
+                        </li>
+                        <li>
+                            <label class="graph-legend-item">
+                                <input type="checkbox" data-node-type="doc" checked>
+                                <span>Documentation</span>
+                                <span class="count">({{ graph_counts.get("doc", 0) }})</span>
+                            </label>
+                        </li>
+                    </ul>
+                </div>
+                <div class="graph-legend-group">
+                    <ul class="graph-legend graph-edge-legend">
+                        <li class="graph-legend-inline-title">
+                            <span class="graph-legend-group-title">Relationship Arrows:</span>
+                        </li>
+                        <li>
+                            <label class="graph-legend-item">
+                                <input type="checkbox" data-edge-type="has" checked>
+                                <span class="legend-arrow legend-arrow-has"></span>
+                                <span>has</span>
+                                <span class="count">({{ graph_edge_counts.get("has", 0) }})</span>
+                            </label>
+                        </li>
+                        <li>
+                            <label class="graph-legend-item">
+                                <input type="checkbox" data-edge-type="depends">
+                                <span class="legend-arrow legend-arrow-depends"></span>
+                                <span>depends on</span>
+                                <span class="count">({{ graph_edge_counts.get("depends", 0) }})</span>
+                            </label>
+                        </li>
+                    </ul>
+                </div>
+            </div>
             <div class="mermaid" id="graphMermaid"></div>
         </details>
         <div class="container">
@@ -1042,10 +1125,10 @@ def information_page(
             <h2 class="metadata-title">Overview</h2>
             <p>{{ metadata.get("http://purl.org/dc/elements/1.1/description", [{"@value":"Untitled"}])[0]["@value"].replace("\n", "<br>") }}</p>
             <hr>
-            <p><strong>ID:</strong> <a href="{{unexpanded_metadata.get("@id", "Undefined") if "http" in unexpanded_metadata.get("@id", "Undefined") else base_iri  }}" target='_blank'> 
+            <p><strong>ID:</strong> <a href="{{unexpanded_metadata.get("@id", "Undefined") if "http" in unexpanded_metadata.get("@id", "Undefined") else base_iri  }}" target='_blank' rel='noopener noreferrer'> 
                 {{ unexpanded_metadata.get("@id", "Undefined") if "http" in unexpanded_metadata.get("@id", "Undefined") else metadata.get("@id", "Undefined").split("/")[-1] }}
             </a></p>
-            <p><strong>Information page metadata:</strong> <a href="{{base_iri}}/metadata.json" target='_blank'> 
+            <p><strong>Information page metadata:</strong> <a href="{{base_iri}}/metadata.json" target='_blank' rel='noopener noreferrer'> 
                 metadata.json 
             </a></p>
             
@@ -1060,7 +1143,7 @@ def information_page(
             
             
             
-            <p><strong>Type:</strong> <a href="{{ expanded_metadata[0].get('@type', [''])[0] }}" target='_blank'>{{ metadata.get('@type', ['Undefined'])[0].replace("https://kgrid.org/koio#","") }}</a></p>
+            <p><strong>Type:</strong> <a href="{{ expanded_metadata[0].get('@type', [''])[0] }}" target='_blank' rel='noopener noreferrer'>{{ metadata.get('@type', ['Undefined'])[0].replace("https://kgrid.org/koio#","") }}</a></p>
             <p><strong>Version:</strong> {{ metadata.get("http://purl.org/dc/elements/1.1/version", [{"@value":"Undefined"}])[0]["@value"] }}</p>
             <p><strong>Date:</strong> {{ metadata.get("http://purl.org/dc/elements/1.1/date", [{"@value":"Undefined"}])[0]["@value"] }}</p>
             {%if metadata.get("http://schema.org/funder", [{"@value":"Undefined"}]) != [{"@value":"Undefined"}]%}
@@ -1068,32 +1151,40 @@ def information_page(
             {% endif %}
             {% if metadata.get("http://purl.org/dc/elements/1.1/license") %}
             <p><strong>License:</strong> 
-                    <a href="{{ metadata.get("http://purl.org/dc/elements/1.1/license", [{}])[0].get("@id", "undefined") }}" target='_blank'>
+                    <a href="{{ metadata.get("http://purl.org/dc/elements/1.1/license", [{}])[0].get("@id", "undefined") }}" target='_blank' rel='noopener noreferrer'>
                         {{ metadata.get("http://purl.org/dc/elements/1.1/license", [{}])[0].get("@id", "undefined")| filename }}
                     </a></p>
             {% endif %}
-            {% if metadata.get("http://purl.org/dc/elements/1.1/source") %}
-                <p><strong>Source:</strong> 
-                    <a href="{{ metadata.get("http://purl.org/dc/elements/1.1/source", [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
-                        {{ metadata.get("http://purl.org/dc/elements/1.1/source", [{"@value":"Undefined"}])[0]["@value"] }}
+            
+            {% set sources = metadata.get("http://purl.org/dc/elements/1.1/source", [{}]) %}                  
+            {% if sources != [{}] %}
+                </p><b>Source:</b></p>
+                {% set sources = [sources] if sources is mapping else sources %}   
+                <ul>                 
+                {% for source in sources %} 
+                    <li>     
+                    <a href="{{ source["@id"] }}" target='_blank' rel='noopener noreferrer'>
+                        {{ source["http://purl.org/dc/elements/1.1/bibliographicCitation"][0]["@value"] }}
                     </a>
-                </p>
+                    </li>
+                {% endfor %}   
+                </ul>
             {% endif %}
             
             {% set isReferencedBys = metadata.get("http://purl.org/dc/elements/1.1/isReferencedBy", [{}]) %}                  
-                        {% if isReferencedBys != [{}] %}
-                            </p><b>Is referenced by:</b></p>
-                            {% set isReferencedBys = [isReferencedBys] if isReferencedBys is mapping else isReferencedBys %}   
-                            <ul>                 
-                            {% for isReferencedBy in isReferencedBys %} 
-                                <li>     
-                                <a href="{{ isReferencedBy["@id"] }}" target='_blank'>
-                                    {{ isReferencedBy["http://purl.org/dc/elements/1.1/bibliographicCitation"][0]["@value"] }}
-                                </a>
-                                </li>
-                            {% endfor %}   
-                            </ul>
-                        {% endif %}
+            {% if isReferencedBys != [{}] %}
+                </p><b>Is referenced by:</b></p>
+                {% set isReferencedBys = [isReferencedBys] if isReferencedBys is mapping else isReferencedBys %}   
+                <ul>                 
+                {% for isReferencedBy in isReferencedBys %} 
+                    <li>     
+                    <a href="{{ isReferencedBy["@id"] }}" target='_blank' rel='noopener noreferrer'>
+                        {{ isReferencedBy["http://purl.org/dc/elements/1.1/bibliographicCitation"][0]["@value"] }}
+                    </a>
+                    </li>
+                {% endfor %}   
+                </ul>
+            {% endif %}
             <hr>
             {% set creators = metadata.get("http://schema.org/creator", [{}]) %}
             {% if creators != [{}] %}
@@ -1112,13 +1203,13 @@ def information_page(
                         {% endif %}
                         {% if creator.get('http://schema.org/email', [{"@value":"Undefined"}]) != [{"@value":"Undefined"}] %}
                             <p><strong>Email:</strong> 
-                                <a href="mailto:{{ creator.get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
+                                <a href="mailto:{{ creator.get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank' rel='noopener noreferrer'>
                                     {{ creator.get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}
                                 </a>
                             </p>
                         {% endif %}
                         <p><strong>Website:</strong> 
-                            <a href="{{ creator.get('@id', 'Undefined') }}" target='_blank'>
+                            <a href="{{ creator.get('@id', 'Undefined') }}" target='_blank' rel='noopener noreferrer'>
                                 {{ creator.get('@id', 'Undefined') }}
                             </a>
                         </p>
@@ -1132,12 +1223,12 @@ def information_page(
                     {{ metadata.get("http://schema.org/contributor", [{}])[0].get("http://schema.org/familyName",[{"@value":""}])[0]["@value"] }} {{ metadata.get("http://schema.org/contributor", [{}])[0].get("http://schema.org/name", [{"@value":""}])[0]["@value"] }}</p>
                 <p><strong>Affiliation:</strong> {{ metadata.get("http://schema.org/contributor", [{}])[0].get("http://schema.org/affiliation", [{"@value":"Undefined"}])[0]["@value"] }}</p>
                 <p><strong>Email:</strong> 
-                    <a href="mailto:{{ metadata.get('http://schema.org/contributor',  [{}])[0].get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
+                    <a href="mailto:{{ metadata.get('http://schema.org/contributor',  [{}])[0].get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank' rel='noopener noreferrer'>
                         {{ metadata.get('http://schema.org/contributor',  [{}])[0].get('http://schema.org/email', [{"@value":"Undefined"}])[0]["@value"] }}
                     </a>
                 </p>
                 <p><strong>Website:</strong> 
-                    <a href="{{ metadata.get('http://schema.org/contributor', [{}])[0].get('@id', 'Undefined') }}" target='_blank'>
+                    <a href="{{ metadata.get('http://schema.org/contributor', [{}])[0].get('@id', 'Undefined') }}" target='_blank' rel='noopener noreferrer'>
                         {{ metadata.get('http://schema.org/contributor',  [{}])[0].get('@id', 'Undefined') }}
                     </a>
                 </p>
@@ -1149,7 +1240,7 @@ def information_page(
                     {{ metadata.get("http://purl.org/dc/elements/1.1/publisher", [{"@value":"Undefined"}])[0]["@value"] }}
                 </p>
             {% endif %}           
-            
+            <br/>
 
             {% if knowledge_items!=[] %}
                 <hr>
@@ -1158,9 +1249,10 @@ def information_page(
                     {% set hasKnowledgeObject = knowledge.get("https://kgrid.org/koio#hasKnowledgeObject", [{}]) %}
                     {% set knowledgeType = knowledge.get("@type", ["Undefined"])[0]%}
                     {% set knowledge_anchor = knowledge.get("@id", "").split('/')[-1] %}
+                    <a id="graph-knowledge-{{ loop.index }}"></a>
                     <a id="{{ knowledge_anchor }}"></a>
                     {% if knowledgeType ==  "https://kgrid.org/koio#KnowledgeSet" and hasKnowledgeObject ==  [{}]%}  
-                        <p><a href='{{ knowledge.get("@id", "") }}' target='_blank'>
+                        <p><a href='{{ knowledge.get("@id", "") }}' target='_blank' rel='noopener noreferrer'>
                             <h3> {{ knowledge.get("http://purl.org/dc/elements/1.1/title", [{"@value": knowledge.get("@id", "").split('/')[-1]}])[0]["@value"] }}</h3>
                         </a>
                     {% else%}</p>
@@ -1171,7 +1263,7 @@ def information_page(
                     </p>
 
                     <p><strong>Type:</strong> 
-                            <a href="{{ knowledge.get("@type", ["Undefined"])[0] }}" target='_blank'>
+                            <a href="{{ knowledge.get("@type", ["Undefined"])[0] }}" target='_blank' rel='noopener noreferrer'>
                                 {{ knowledge.get("@type", ["Undefined"])[0].replace("https://kgrid.org/koio#","") }}
                             </a>
                     </p>
@@ -1205,14 +1297,14 @@ def information_page(
                                 {% endif %}
                                 {% if knowledge.get("http://schema.org/creator",[{}])[0].get("http://schema.org/email")%}
                                 <p><strong>Email:</strong> 
-                                    <a href="mailto:{{ creator.get("http://schema.org/email", [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
+                                    <a href="mailto:{{ creator.get("http://schema.org/email", [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank' rel='noopener noreferrer'>
                                         {{ creator.get("http://schema.org/email", [{"@value":"Undefined"}])[0]["@value"] }}
                                     </a>
                                 </p>
                                 {% endif %}
                                 {% if creator.get("@id")%}
                                 <p><strong>Website:</strong> 
-                                    <a href="mailto:{{ creator.get("@id", "Undefined") }}" target='_blank'>
+                                    <a href="mailto:{{ creator.get("@id", "Undefined") }}" target='_blank' rel='noopener noreferrer'>
                                         {{ creator.get("@id", "Undefined") }}
                                     </a>
                                 </p>
@@ -1223,7 +1315,7 @@ def information_page(
                     {% endif %}
                     {% if knowledge.get("http://purl.org/dc/elements/1.1/source") %}
                         <p><strong>Source:</strong> 
-                            <a href="{{ knowledge.get("http://purl.org/dc/elements/1.1/source", [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank'>
+                            <a href="{{ knowledge.get("http://purl.org/dc/elements/1.1/source", [{"@value":"Undefined"}])[0]["@value"] }}" target='_blank' rel='noopener noreferrer'>
                                 {{ knowledge.get("http://purl.org/dc/elements/1.1/source", [{"@value":"Undefined"}])[0]["@value"] }}
                             </a>
                         </p>
@@ -1235,7 +1327,7 @@ def information_page(
                         <ul>                 
                         {% for isReferencedBy in isReferencedBys %} 
                             <li>     
-                            <a href="{{ isReferencedBy["@value"] }}" target='_blank'>
+                            <a href="{{ isReferencedBy["@value"] }}" target='_blank' rel='noopener noreferrer'>
                                 {{ isReferencedBy["@value"] }}
                             </a>
                             </li>
@@ -1254,11 +1346,11 @@ def information_page(
                         <ul>
                         {% for implementation in implemented_by %}
                             <li>
-                            <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank'>
+                            <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank' rel='noopener noreferrer'>
                                 {{ implementation.get("http://purl.org/dc/elements/1.1/title") if implementation.get("http://purl.org/dc/elements/1.1/title") else implementation.get("@id", "Undefined") | filename}}
                             </a><br/>(type: 
                                 {% set imp_types = implementation.get("@type", "Undefined")%}
-                                {% for imp_type in imp_types %}<a href="{{ imp_type }}" target='_blank'>{{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").replace("http://www.ebi.ac.uk/swo/SWO_0000108","JavaScript").split("/")[-1].split("#")[-1]}}</a>{% if not loop.last %}, {% endif %}{% endfor %})
+                                {% for imp_type in imp_types %}<a href="{{ imp_type }}" target='_blank' rel='noopener noreferrer'>{{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").replace("http://www.ebi.ac.uk/swo/SWO_0000108","JavaScript").split("/")[-1].split("#")[-1]}}</a>{% if not loop.last %}, {% endif %}{% endfor %})
                             </li>
                         {% endfor %}
                         </ul>
@@ -1269,7 +1361,7 @@ def information_page(
                         <ul>
                         {% for ko in hasKnowledgeObject %}
                             <li>
-                            <a href="{{ ko.get("@id", ko.get("@value", "Undefined")) }}" target='_blank'>
+                            <a href="{{ ko.get("@id", ko.get("@value", "Undefined")) }}" target='_blank' rel='noopener noreferrer'>
                                 {{ ko.get("@id", ko.get("@value", "Undefined")) }}
                             </a>
                             </li>
@@ -1285,7 +1377,8 @@ def information_page(
                     <p><strong>Format:</strong> 
                         {{ knowledge.get("http://purl.org/dc/elements/1.1/format", [{"@value":"Undefined"}])[0]["@value"] }}
                     </p>
-                    {% endif %}                   
+                    {% endif %}      
+                    <br/>             
                 {% endfor %}
             {% endif %}
 
@@ -1295,9 +1388,14 @@ def information_page(
             
             {% for service in services %}
 
+                <a id="graph-service-{{ loop.index }}"></a>
+
                 <p><h3> {{ service.get("@id", "").split('/')[-1] }}</h3></p>
+                {% if service.get("http://purl.org/dc/elements/1.1/description") %}
+                    <p><strong>Description:</strong> {{ service.get("http://purl.org/dc/elements/1.1/description", [{"@value":""}])[0]["@value"] }}</p>
+                {% endif %}
                 <p><strong>Type:</strong> 
-                        <a href="{{ service.get("@type", ["Undefined"])[0] }}" target='_blank'>
+                        <a href="{{ service.get("@type", ["Undefined"])[0] }}" target='_blank' rel='noopener noreferrer'>
                             {{ service.get("@type", ["Undefined"])[0].replace("https://kgrid.org/koio#","") }}
                         </a>
                 </p>
@@ -1313,7 +1411,7 @@ def information_page(
                 </p>
                 {% if service.get("http://www.ebi.ac.uk/swo/SWO_0004001") %}
                         <p><strong>Has interface:</strong> 
-                            <a href="{{ service.get("http://www.ebi.ac.uk/swo/SWO_0004001", [{"@id":"Undefined"}])[0]["@id"] }}" target='_blank'>
+                            <a href="{{ service.get("http://www.ebi.ac.uk/swo/SWO_0004001", [{"@id":"Undefined"}])[0]["@id"] }}" target='_blank' rel='noopener noreferrer'>
                                 {{ service.get("http://www.ebi.ac.uk/swo/SWO_0004001", [{"@value":"Undefined"}])[0]["@id"] | filename }}
                             </a>
                         </p>
@@ -1325,21 +1423,22 @@ def information_page(
                         {% for implementation in implemented_by %}
                             <li>
                             {% if implementation.get("@id", "Undefined") | filename == "" or implementation.get("@id", "Undefined") | filename == "." %}
-                                <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank'>
+                                <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank' rel='noopener noreferrer'>
                                     {{ service.get("@id", "").replace("_:","")}}
                                 </a>
                             {% else%}
-                                <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank'>
+                                <a href="{{ implementation.get("@id", "Undefined") }}" target='_blank' rel='noopener noreferrer'>
                                     {{ implementation.get("@id", "Undefined") | filename}}
                                 </a>                                 
                             {% endif %}  <br/>(type: 
                                 {% set imp_types = implementation.get("@type", "Undefined")%}
-                                {% for imp_type in imp_types %}<a href="{{ imp_type }}" target='_blank'>{{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").replace("http://www.ebi.ac.uk/swo/SWO_0000108","JavaScript").split("/")[-1].split("#")[-1]}}</a>{% if not loop.last %}, {% endif %}{% endfor %}) 
+                                {% for imp_type in imp_types %}<a href="{{ imp_type }}" target='_blank' rel='noopener noreferrer'>{{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").replace("http://www.ebi.ac.uk/swo/SWO_0000108","JavaScript").split("/")[-1].split("#")[-1]}}</a>{% if not loop.last %}, {% endif %}{% endfor %}) 
                             </li>
                         {% endfor %}      
                         </ul>            
                     </p>
                 {% endif %}
+                <br/>
             {% endfor %}
             {% endif %}
         </div>            
@@ -1356,7 +1455,7 @@ def information_page(
                             {% set imp_types = [imp_types] %}
                         {% endif %}
                         <h3>
-                        <a href="{{ doc.get('@id', '#') }}" target='_blank'>{{ doc.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a>
+                        <a href="{{ doc.get('@id', '#') }}" target='_blank' rel='noopener noreferrer'>{{ doc.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a>
                         <br/>
                         {% for imp_type in imp_types %}
                             {% if "Google Colab Notebook" in imp_type %}
@@ -1381,7 +1480,7 @@ def information_page(
                         <p><strong>Type:</strong> 
                         
                         {% for imp_type in imp_types %}  
-                                <a href="{{ imp_type }}" target='_blank'>
+                                <a href="{{ imp_type }}" target='_blank' rel='noopener noreferrer'>
                                     {{ imp_type.replace("https://kgrid.org/koio#","").split("/")[-1].split("#")[-1]}}
                                 </a>{% if not loop.last %}, {% endif %}
                         {% endfor %}
@@ -1399,8 +1498,9 @@ def information_page(
                 <h2 class="section-emphasis section-test">Tests</h2>
                 <ul>
                 {% for test in tests %}
+                    <a id="graph-test-{{ loop.index }}"></a>
                     <li>
-                        <h3><a href="{{ test.get('http://www.ebi.ac.uk/swo/SWO_0000085', [{}])[0].get('@id', '#') }}" target='_blank'>{{ test.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a></h3>
+                        <h3><a href="{{ test.get('http://www.ebi.ac.uk/swo/SWO_0000085', [{}])[0].get('@id', '#') }}" target='_blank' rel='noopener noreferrer'>{{ test.get('http://purl.org/dc/elements/1.1/title', [{"@value":"Untitled"}])[0]["@value"] }}</a></h3>
                         <p>{{ test.get('http://purl.org/dc/elements/1.1/description', [{"@value":"No description"}])[0]["@value"] }}</p>
                         {% if test.get("item_of","")!="" %}
                             <p><strong>Test of:</strong> {{test.get("item_of","")[0]["@value"]}} ({{ test.get("type","") }}) </p>
@@ -1408,7 +1508,7 @@ def information_page(
                         <p><strong>Type:</strong> 
                         {% set imp_types = test.get('http://www.ebi.ac.uk/swo/SWO_0000085', [{}])[0].get('@type', '#')%}
                         {% for imp_type in imp_types %}  
-                                <a href="{{ imp_type }}" target='_blank'>
+                                <a href="{{ imp_type }}" target='_blank' rel='noopener noreferrer'>
                                     {{ imp_type.replace("http://www.ebi.ac.uk/swo/SWO_0000118","Python").replace("http://www.ebi.ac.uk/swo/SWO_0000108","JavaScript").split("/")[-1].split("#")[-1]}}
                                 </a>{% if not loop.last %}, {% endif %}
                         {% endfor %}
@@ -1446,6 +1546,7 @@ def information_page(
                         .filter((box) => box.checked)
                         .map((box) => box.getAttribute("data-node-type"))
                 );
+                activeTypes.add("ko");
 
                 const activeEdgeTypes = new Set(
                     Array.from(edgeTypeCheckboxes)
@@ -1462,7 +1563,7 @@ def information_page(
                         activeEdgeTypes.has(edge.type)
                 );
 
-                const lines = ["graph LR", ...classDefs];
+                const lines = ["graph TB", ...classDefs];
 
                 if (visibleNodes.length === 0) {
                     lines.push('EMPTY["No node types selected"]');
@@ -1493,6 +1594,66 @@ def information_page(
                 return lines.join("\\n");
             }
 
+            function wireGraphNodeLinks() {
+                const svg = graphTarget.querySelector("svg");
+                if (!svg) {
+                    return;
+                }
+
+                for (const node of graphData.nodes) {
+                    // Mermaid renders flowchart nodes with IDs like flowchart-N1-0.
+                    const nodeElement = svg.querySelector(`g.node[id*="-${node.id}-"]`);
+                    if (!nodeElement) {
+                        continue;
+                    }
+
+                    const fullLabel = node.full_label || node.label;
+                    const titleText = node.link ? `${fullLabel}\nOpen artifact` : fullLabel;
+                    let titleEl = nodeElement.querySelector("title");
+                    if (!titleEl) {
+                        titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                        nodeElement.prepend(titleEl);
+                    }
+                    titleEl.textContent = titleText;
+
+                    if (node.link) {
+                        nodeElement.style.cursor = "pointer";
+                        nodeElement.addEventListener("click", () => {
+                            window.open(node.link, "_blank", "noopener,noreferrer");
+                        });
+                    }
+                }
+            }
+
+            function fitGraphToContainer() {
+                const svg = graphTarget.querySelector("svg");
+                if (!svg) {
+                    return;
+                }
+
+                const box = svg.viewBox && svg.viewBox.baseVal;
+                const naturalWidth = box && box.width ? box.width : svg.getBBox().width;
+                const naturalHeight = box && box.height ? box.height : svg.getBBox().height;
+                if (!naturalWidth || !naturalHeight) {
+                    return;
+                }
+
+                const styles = getComputedStyle(graphTarget);
+                const maxHeight = parseFloat(styles.maxHeight) || naturalHeight;
+                const paddingX = (parseFloat(styles.paddingLeft) || 0) + (parseFloat(styles.paddingRight) || 0);
+                const paddingY = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+                const availableWidth = Math.max(1, graphTarget.clientWidth - paddingX);
+                const availableHeight = Math.max(1, maxHeight - paddingY);
+                const innerMargin = 10;
+                const widthScale = Math.max(0.01, (availableWidth - innerMargin * 2) / naturalWidth);
+                const heightScale = Math.max(0.01, (availableHeight - innerMargin * 2) / naturalHeight);
+                const scale = Math.min(1, widthScale, heightScale);
+
+                svg.style.maxWidth = "none";
+                svg.style.width = `${naturalWidth * scale}px`;
+                svg.style.height = `${naturalHeight * scale}px`;
+            }
+
             async function renderRelationshipGraph() {
                 if (!graphPanel.open) {
                     return;
@@ -1502,13 +1663,16 @@ def information_page(
                 const renderId = `relationship-graph-${Date.now()}`;
                 const { svg } = await mermaid.render(renderId, definition);
                 graphTarget.innerHTML = svg;
+                fitGraphToContainer();
+                requestAnimationFrame(fitGraphToContainer);
+                wireGraphNodeLinks();
             }
 
             mermaid.initialize({
                 startOnLoad: false,
                 theme: "neutral",
                 securityLevel: "loose",
-                flowchart: { curve: "catmullRom", nodeSpacing: 10, rankSpacing: 100, padding: 5 }
+                flowchart: { curve: "catmullRom", nodeSpacing: 10, rankSpacing: 100, padding: 5, useMaxWidth: false }
             });
 
             graphPanel.addEventListener("toggle", () => {
@@ -1520,6 +1684,14 @@ def information_page(
             for (const box of legendCheckboxes) {
                 box.addEventListener("change", renderRelationshipGraph);
             }
+
+            window.addEventListener("resize", () => {
+                fitGraphToContainer();
+            });
+
+            if (graphPanel.open) {
+                renderRelationshipGraph();
+            }
         </script>
     </body>
     </html>
@@ -1530,8 +1702,9 @@ def information_page(
     tests = find_item(metadata, "https://kgrid.org/koio#hasTest", [],metadata.get("http://purl.org/dc/elements/1.1/title", ""), metadata.get("@type", {"@value":[]})[0].split('/')[-1])
     knowledge_items = metadata.get("https://kgrid.org/koio#hasKnowledge", [])
     services = metadata.get("https://kgrid.org/koio#hasService", [])
+    graph_link_base = os.path.dirname(base_iri) if base_iri and base_iri != "." else "."
     graph_data = build_relationship_graph(
-        metadata, knowledge_items, services, tests, documentation
+        metadata, knowledge_items, services, tests, documentation, graph_link_base
     )
     graph_data_json = json.dumps(graph_data)
     # Render the template
@@ -1767,6 +1940,17 @@ information_page(
     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/index.html",
     False
 )
+information_page(
+    "C:/dev/FAIR-DO-Workshop/collection/dfu-hbot-bounded-regimen-and-execution-burden/metadata.json",
+    "C:/dev/FAIR-DO-Workshop/collection/dfu-hbot-bounded-regimen-and-execution-burden/index.html",
+    False
+)
+information_page(
+    "C:/dev/FAIR-DO-Workshop/collection/margolis-dfu-prognostic/metadata.json",
+    "C:/dev/FAIR-DO-Workshop/collection/margolis-dfu-prognostic/index.html",
+    False
+)
+
 # init("test")
 
 if __name__ == "__main__":
