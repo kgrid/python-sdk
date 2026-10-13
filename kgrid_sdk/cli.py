@@ -2054,11 +2054,11 @@ def init(name: str):
 #     "C:/dev/FAIR-DO-Workshop/HBOT3-KA/index.html",
 #     False
 # )
-information_page(
-    "C:/dev/metadata.json",
-    "C:/dev/index.html",
-    False
-)
+# information_page(
+#     "C:/dev/metadata.json",
+#     "C:/dev/index.html",
+#     False
+# )
 
 # init("test")
 
