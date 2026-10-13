@@ -1252,11 +1252,13 @@ def information_page(
                 {% set sources = [sources] if sources is mapping else sources %}   
                 <ul>                 
                 {% for source in sources %} 
-                    <li>     
-                    <a href="{{ source["@id"] }}" target='_blank' rel='noopener noreferrer'>
-                        {{ source["http://purl.org/dc/elements/1.1/bibliographicCitation"][0]["@value"] }}
-                    </a>
-                    </li>
+                    {% if source.get("@id") and source.get("http://purl.org/dc/elements/1.1/bibliographicCitation") %}
+                        <li>     
+                        <a href="{{ source["@id"] }}" target='_blank' rel='noopener noreferrer'>
+                            {{ source["http://purl.org/dc/elements/1.1/bibliographicCitation"][0]["@value"] }}
+                        </a>
+                        </li>
+                    {% endif %}
                 {% endfor %}   
                 </ul>
             {% endif %}
@@ -1267,11 +1269,13 @@ def information_page(
                 {% set isReferencedBys = [isReferencedBys] if isReferencedBys is mapping else isReferencedBys %}   
                 <ul>                 
                 {% for isReferencedBy in isReferencedBys %} 
-                    <li>     
-                    <a href="{{ isReferencedBy["@id"] }}" target='_blank' rel='noopener noreferrer'>
-                        {{ isReferencedBy["http://purl.org/dc/elements/1.1/bibliographicCitation"][0]["@value"] }}
-                    </a>
-                    </li>
+                    {% if isReferencedBy.get("@id") and isReferencedBy.get("http://purl.org/dc/elements/1.1/bibliographicCitation") %}
+                        <li>     
+                        <a href="{{ isReferencedBy["@id"] }}" target='_blank' rel='noopener noreferrer'>
+                            {{ isReferencedBy["http://purl.org/dc/elements/1.1/bibliographicCitation"][0]["@value"] }}
+                        </a>
+                        </li>
+                    {% endif %}
                 {% endfor %}   
                 </ul>
             {% endif %}
@@ -2050,6 +2054,11 @@ def init(name: str):
 #     "C:/dev/FAIR-DO-Workshop/HBOT3-KA/index.html",
 #     False
 # )
+information_page(
+    "C:/dev/metadata.json",
+    "C:/dev/index.html",
+    False
+)
 
 # init("test")
 
