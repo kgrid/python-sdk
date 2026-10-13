@@ -756,12 +756,14 @@ def information_page(
         }
 
         .graph-node-legend {
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             gap: 6px;
             overflow-x: auto;
             overflow-y: hidden;
             padding-bottom: 2px;
         }
+
+        
 
         .graph-node-legend .graph-legend-item {
             padding: 5px 9px 5px 7px;
@@ -781,8 +783,12 @@ def information_page(
         }
 
         .graph-legend-group {
-            flex: 1 1 360px;
+            flex: 1 1 0px;
             min-width: 280px;
+        }
+        
+        .graph-legend-group.graph-legend-nodes {
+            flex: 1.5 1 0;
         }
 
         .graph-legend-group-title {
@@ -1142,7 +1148,7 @@ def information_page(
                 </div>
             </summary>
             <div class="graph-legend-layout">
-                <div class="graph-legend-group">
+                <div class="graph-legend-group graph-legend-nodes">
                     <ul class="graph-legend graph-node-legend">
                         <li class="graph-legend-inline-title">
                             <span class="graph-legend-group-title">Nodes:</span>
@@ -1339,6 +1345,10 @@ def information_page(
                         <p><a href='{{ knowledge.get("@id", "") }}' target='_blank' rel='noopener noreferrer'>
                             <h3> {{ knowledge.get("http://purl.org/dc/elements/1.1/title", [{"@value": knowledge.get("@id", "").split('/')[-1]}])[0]["@value"] }}</h3>
                         </a>
+                    {% elif knowledgeType ==  "https://kgrid.org/koio#KnowledgeObject" %}  
+                                            <p><a href='{{ knowledge.get("@id", "") }}' target='_blank' rel='noopener noreferrer'>
+                                                <h3> {{   knowledge.get("@id", "").split('/')[-1] }}</h3>
+                                            </a>    
                     {% else%}</p>
                         <p><h3> {{ knowledge.get("http://purl.org/dc/elements/1.1/title", [{"@value": knowledge.get("@id", "").split('/')[-1]}])[0]["@value"] }}</h3></p>
                     {% endif %}     
@@ -2016,23 +2026,28 @@ def init(name: str):
 #     False,
 # )
 # information_page(
-#     "C:/dev/FAIR-DO-Workshop/collection/wagner/metadata.json",
-#     "C:/dev/FAIR-DO-Workshop/collection/wagner/index.html",
+#     "C:/dev/FAIR-DO-Workshop/collection/DFU-Prognostic-Indicator-KO/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/collection/DFU-Prognostic-Indicator-KO/index.html",
 #     False
 # )
 # information_page(
-#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/metadata.json",
-#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbo2-treatment-decision/index.html",
+#     "C:/dev/FAIR-DO-Workshop/collection/DFU-Severity-Score-KO/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/collection/DFU-Severity-Score-KO/index.html",
 #     False
 # )
 # information_page(
-#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbot-bounded-regimen-and-execution-burden/metadata.json",
-#     "C:/dev/FAIR-DO-Workshop/collection/dfu-hbot-bounded-regimen-and-execution-burden/index.html",
+#     "C:/dev/FAIR-DO-Workshop/collection/HBOT-Regimen-Burden-KO/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/collection/HBOT-Regimen-Burden-KO/index.html",
 #     False
 # )
 # information_page(
-#     "C:/dev/FAIR-DO-Workshop/collection/margolis-dfu-prognostic/metadata.json",
-#     "C:/dev/FAIR-DO-Workshop/collection/margolis-dfu-prognostic/index.html",
+#     "C:/dev/FAIR-DO-Workshop/collection/HBOT-Treatment-Decision-KO/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/collection/HBOT-Treatment-Decision-KO/index.html",
+#     False
+# )
+# information_page(
+#     "C:/dev/FAIR-DO-Workshop/HBOT3-KA/metadata.json",
+#     "C:/dev/FAIR-DO-Workshop/HBOT3-KA/index.html",
 #     False
 # )
 
